@@ -12,10 +12,53 @@ const detailDescription = document.getElementById('detailDescription');
 const modulesGrid = document.getElementById('modulesGrid');
 
 // 初始化
-document.addEventListener('DOMContentLoaded', () => {
-    loadSubjects();
-    setupEventListeners();
+document.addEventListener('DOMContentLoaded', async () => {
+    const isLoggedIn = await checkLoginStatus();
+    if (isLoggedIn) {
+        loadSubjects();
+        setupEventListeners();
+    }
+    // 如果未登录，checkLoginStatus 已经处理了跳转，不需要执行其他操作
 });
+
+// 检查登录状态，返回是否已登录
+async function checkLoginStatus() {
+    try {
+        const response = await fetch('/api/user/info', {
+            // 添加 credentials 确保发送 cookie/session
+            credentials: 'same-origin'
+        });
+        
+        if (response.ok) {
+            const user = await response.json();
+            const userNameEl = document.getElementById('userName');
+            if (userNameEl) {
+                userNameEl.textContent = `欢迎，${user.name || user.id}！`;
+            }
+            return true; // 已登录
+        } else if (response.status === 401) {
+            // 未登录，跳转到登录页（静默处理，不显示错误）
+            // 只在当前不在登录页时才跳转
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+                window.location.href = '/login';
+            }
+            return false; // 未登录
+        } else {
+            // 其他错误，也跳转到登录页
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+                window.location.href = '/login';
+            }
+            return false;
+        }
+    } catch (error) {
+        // 网络错误时，不显示错误信息，静默处理
+        // 只在当前不在登录页时才跳转
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+            console.warn('检查登录状态失败，可能是网络问题');
+        }
+        return false;
+    }
+}
 
 // 设置事件监听器
 function setupEventListeners() {
@@ -31,17 +74,49 @@ function setupEventListeners() {
     backBtn.addEventListener('click', () => {
         showSubjectsGrid();
     });
+
+    // 登出按钮
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            if (confirm('确定要退出登录吗？')) {
+                try {
+                    const response = await fetch('/api/logout', {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        window.location.href = '/login';
+                    }
+                } catch (error) {
+                    console.error('登出失败:', error);
+                }
+            }
+        });
+    }
 }
 
 // 加载学科列表
 async function loadSubjects() {
     try {
         const response = await fetch('/api/subjects');
+        if (response.status === 401) {
+            // 未登录，跳转到登录页（只跳转一次）
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
+            return;
+        }
+        if (!response.ok) {
+            throw new Error('加载失败');
+        }
         subjects = await response.json();
         renderSubjects();
     } catch (error) {
         console.error('加载学科失败:', error);
-        showError('加载学科失败，请刷新页面重试');
+        // 网络错误不显示错误信息，避免干扰
+        if (error.message === '加载失败') {
+            showError('加载学科失败，请刷新页面重试');
+        }
     }
 }
 
@@ -105,10 +180,22 @@ async function showSubjectDetail(subjectId) {
     try {
         // 加载学科详情
         const response = await fetch(`/api/subject/${subjectId}`);
+        if (response.status === 401) {
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
+            return;
+        }
         const subject = await response.json();
         
         // 加载模块列表
         const modulesResponse = await fetch(`/api/subject/${subjectId}/modules`);
+        if (modulesResponse.status === 401) {
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
+            return;
+        }
         const modules = await modulesResponse.json();
         
         // 更新详情页面
@@ -160,4 +247,5 @@ function createModuleCard(module) {
 function showError(message) {
     alert(message);
 }
+
 
