@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词学习 - 小学生学习平台</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/vocabulary.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>📖 单词学习</h1>
+            <div class="header-actions">
+                <button class="back-btn" id="backToTextbooks" onclick="backToTextbooks()" style="display: none;">← 返回教材选择</button>
+                <button class="back-btn" onclick="window.location.href='/'">← 返回首页</button>
+            </div>
+        </header>
+
+        <!-- 教材选择 -->
+        <div class="textbook-selector">
+            <h2>选择教材</h2>
+            <div class="textbooks-grid" id="textbooksGrid">
+                <!-- 教材卡片将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 单词学习区域 -->
+        <div class="vocabulary-content" id="vocabularyContent" style="display: none;">
+            <!-- 统计信息 -->
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">总数</span>
+                    <span class="stat-value" id="statTotal">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">新词</span>
+                    <span class="stat-value stat-new" id="statNew">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">学习中</span>
+                    <span class="stat-value stat-learning" id="statLearning">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">已掌握</span>
+                    <span class="stat-value stat-mastered" id="statMastered">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">需复习</span>
+                    <span class="stat-value stat-review" id="statReview">0</span>
+                </div>
+            </div>
+
+            <!-- 字母导航 -->
+            <div class="letter-nav" id="letterNav">
+                <!-- 字母按钮将通过JavaScript动态加载 -->
+            </div>
+
+            <!-- 单词列表 -->
+            <div class="words-container">
+                <div class="words-list" id="wordsList">
+                    <!-- 单词卡片将通过JavaScript动态加载 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/vocabulary.js') }}"></script>
+</body>
+</html>
+

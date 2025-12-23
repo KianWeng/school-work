@@ -11,7 +11,8 @@ from functools import wraps
 import hashlib
 import os
 import re
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -47,6 +48,27 @@ class User(db.Model):
     def hash_password(password):
         """生成密码哈希"""
         return hashlib.md5(password.encode()).hexdigest()
+
+# 单词学习进度模型
+class WordProgress(db.Model):
+    __tablename__ = 'word_progress'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(20), db.ForeignKey('users.username'), nullable=False, index=True)
+    word = db.Column(db.String(100), nullable=False, index=True)
+    textbook = db.Column(db.String(50), nullable=False, index=True)  # 教材：ket, new_concept, oxford等
+    level = db.Column(db.String(20), nullable=True)  # 级别：A, B, C等
+    status = db.Column(db.String(20), default='new')  # new, learning, mastered, review
+    review_count = db.Column(db.Integer, default=0)
+    last_review = db.Column(db.DateTime)
+    next_review = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (db.UniqueConstraint('user_id', 'word', 'textbook', name='unique_user_word'),)
+    
+    def __repr__(self):
+        return f'<WordProgress {self.user_id}:{self.word}:{self.textbook}>'
 
 def login_required(f):
     """登录验证装饰器"""
@@ -246,10 +268,10 @@ def get_subject_modules(subject_id):
             {'id': 'math_game', 'name': '数学游戏', 'description': '有趣的数学游戏'}
         ],
         'english': [
-            {'id': 'vocabulary', 'name': '单词学习', 'description': '学习英语单词'},
-            {'id': 'grammar', 'name': '语法练习', 'description': '练习英语语法'},
-            {'id': 'listening', 'name': '听力训练', 'description': '提高听力水平'},
-            {'id': 'speaking', 'name': '口语练习', 'description': '练习英语口语'}
+            {'id': 'vocabulary', 'name': '单词学习', 'description': '学习英语单词', 'icon': '📖'},
+            {'id': 'grammar', 'name': '语法练习', 'description': '练习英语语法', 'icon': '📝'},
+            {'id': 'listening', 'name': '听力训练', 'description': '提高听力水平', 'icon': '🎧'},
+            {'id': 'speaking', 'name': '口语练习', 'description': '练习英语口语', 'icon': '🗣️'}
         ],
         'science': [
             {'id': 'nature', 'name': '自然现象', 'description': '了解自然现象'},
@@ -263,6 +285,250 @@ def get_subject_modules(subject_id):
         return jsonify(modules[subject_id])
     else:
         return jsonify({'error': '学科不存在'}), 404
+
+# ==================== 英语单词学习相关路由 ====================
+
+@app.route('/english/vocabulary')
+@login_required
+def vocabulary_page():
+    """单词学习页面"""
+    return render_template('vocabulary.html')
+
+@app.route('/api/english/textbooks')
+@login_required
+def get_textbooks():
+    """获取可用的教材列表"""
+    textbooks = [
+        {'id': 'ket', 'name': 'KET', 'description': '剑桥英语入门考试', 'icon': '📚'},
+        # 预留扩展：新概念、牛津等
+        # {'id': 'new_concept', 'name': '新概念英语', 'description': '经典英语教材', 'icon': '📖'},
+        # {'id': 'oxford', 'name': '牛津英语', 'description': '牛津大学出版社教材', 'icon': '🎓'},
+    ]
+    return jsonify(textbooks)
+
+@app.route('/api/english/textbook/<textbook_id>/words')
+@login_required
+def get_words(textbook_id):
+    """获取指定教材的单词列表"""
+    username = session.get('user_id')
+    
+    # 根据教材ID加载单词数据
+    if textbook_id == 'ket':
+        json_file = 'english/ket_A.json'
+    else:
+        return jsonify({'error': '不支持的教材'}), 404
+    
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        words_list = []
+        for letter, words in data.items():
+            for word_data in words:
+                word_item = {
+                    'word': word_data.get('word', ''),
+                    'phonetic': word_data.get('phonetic', ''),
+                    'part_of_speech': word_data.get('part_of_speech', ''),
+                    'chinese': word_data.get('chinese', ''),
+                    'example': word_data.get('example', ''),
+                    'letter': letter,
+                    'textbook': textbook_id
+                }
+                
+                # 获取用户学习进度
+                progress = WordProgress.query.filter_by(
+                    user_id=username,
+                    word=word_item['word'],
+                    textbook=textbook_id
+                ).first()
+                
+                if progress:
+                    word_item['progress'] = {
+                        'status': progress.status,
+                        'review_count': progress.review_count,
+                        'last_review': progress.last_review.isoformat() if progress.last_review else None
+                    }
+                else:
+                    word_item['progress'] = {
+                        'status': 'new',
+                        'review_count': 0,
+                        'last_review': None
+                    }
+                
+                words_list.append(word_item)
+        
+        return jsonify({
+            'total': len(words_list),
+            'words': words_list
+        })
+    except FileNotFoundError:
+        return jsonify({'error': '单词数据文件不存在'}), 404
+    except Exception as e:
+        return jsonify({'error': f'加载单词数据失败: {str(e)}'}), 500
+
+@app.route('/api/english/textbook/<textbook_id>/words/<letter>')
+@login_required
+def get_words_by_letter(textbook_id, letter):
+    """按字母获取单词"""
+    username = session.get('user_id')
+    
+    if textbook_id == 'ket':
+        json_file = 'english/ket_A.json'
+    else:
+        return jsonify({'error': '不支持的教材'}), 404
+    
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if letter.upper() not in data:
+            return jsonify({'error': '字母不存在'}), 404
+        
+        words_list = []
+        for word_data in data[letter.upper()]:
+            word_item = {
+                'word': word_data.get('word', ''),
+                'phonetic': word_data.get('phonetic', ''),
+                'part_of_speech': word_data.get('part_of_speech', ''),
+                'chinese': word_data.get('chinese', ''),
+                'example': word_data.get('example', ''),
+                'letter': letter.upper(),
+                'textbook': textbook_id
+            }
+            
+            # 获取用户学习进度
+            progress = WordProgress.query.filter_by(
+                user_id=username,
+                word=word_item['word'],
+                textbook=textbook_id
+            ).first()
+            
+            if progress:
+                word_item['progress'] = {
+                    'status': progress.status,
+                    'review_count': progress.review_count,
+                    'last_review': progress.last_review.isoformat() if progress.last_review else None
+                }
+            else:
+                word_item['progress'] = {
+                    'status': 'new',
+                    'review_count': 0,
+                    'last_review': None
+                }
+            
+            words_list.append(word_item)
+        
+        return jsonify({
+            'letter': letter.upper(),
+            'total': len(words_list),
+            'words': words_list
+        })
+    except FileNotFoundError:
+        return jsonify({'error': '单词数据文件不存在'}), 404
+    except Exception as e:
+        return jsonify({'error': f'加载单词数据失败: {str(e)}'}), 500
+
+@app.route('/api/english/word/progress', methods=['POST'])
+@login_required
+def update_word_progress():
+    """更新单词学习进度"""
+    username = session.get('user_id')
+    data = request.get_json()
+    
+    word = data.get('word')
+    textbook = data.get('textbook')
+    status = data.get('status', 'learning')  # new, learning, mastered, review
+    
+    if not word or not textbook:
+        return jsonify({'error': '参数不完整'}), 400
+    
+    # 查找或创建进度记录
+    progress = WordProgress.query.filter_by(
+        user_id=username,
+        word=word,
+        textbook=textbook
+    ).first()
+    
+    if not progress:
+        progress = WordProgress(
+            user_id=username,
+            word=word,
+            textbook=textbook,
+            status=status
+        )
+        db.session.add(progress)
+    else:
+        progress.status = status
+        progress.updated_at = datetime.utcnow()
+    
+    # 更新复习相关字段
+    if status == 'mastered':
+        progress.review_count += 1
+        progress.last_review = datetime.utcnow()
+        # 设置下次复习时间（根据复习次数递增间隔）
+        days = min(progress.review_count * 2, 30)  # 最多30天
+        progress.next_review = datetime.utcnow() + timedelta(days=days)
+    elif status == 'review':
+        progress.review_count += 1
+        progress.last_review = datetime.utcnow()
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '进度更新成功',
+            'progress': {
+                'status': progress.status,
+                'review_count': progress.review_count
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'更新失败: {str(e)}'}), 500
+
+@app.route('/api/english/word/stats')
+@login_required
+def get_word_stats():
+    """获取单词学习统计"""
+    username = session.get('user_id')
+    textbook = request.args.get('textbook', 'ket')
+    
+    total = WordProgress.query.filter_by(
+        user_id=username,
+        textbook=textbook
+    ).count()
+    
+    new_count = WordProgress.query.filter_by(
+        user_id=username,
+        textbook=textbook,
+        status='new'
+    ).count()
+    
+    learning_count = WordProgress.query.filter_by(
+        user_id=username,
+        textbook=textbook,
+        status='learning'
+    ).count()
+    
+    mastered_count = WordProgress.query.filter_by(
+        user_id=username,
+        textbook=textbook,
+        status='mastered'
+    ).count()
+    
+    review_count = WordProgress.query.filter_by(
+        user_id=username,
+        textbook=textbook,
+        status='review'
+    ).count()
+    
+    return jsonify({
+        'total': total,
+        'new': new_count,
+        'learning': learning_count,
+        'mastered': mastered_count,
+        'review': review_count
+    })
 
 # 初始化数据库表
 def init_db():

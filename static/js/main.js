@@ -178,6 +178,9 @@ function showSubjectsGrid() {
 // 显示学科详情
 async function showSubjectDetail(subjectId) {
     try {
+        // 更新当前学科
+        currentSubject = subjectId;
+        
         // 加载学科详情
         const response = await fetch(`/api/subject/${subjectId}`);
         if (response.status === 401) {
@@ -202,8 +205,8 @@ async function showSubjectDetail(subjectId) {
         detailTitle.textContent = subject.name;
         detailDescription.textContent = subject.description;
         
-        // 渲染模块
-        renderModules(modules);
+        // 渲染模块（传递学科ID）
+        renderModules(modules, subjectId);
         
         // 显示详情页面
         subjectsGrid.style.display = 'none';
@@ -216,17 +219,17 @@ async function showSubjectDetail(subjectId) {
 }
 
 // 渲染模块
-function renderModules(modules) {
+function renderModules(modules, subjectId) {
     modulesGrid.innerHTML = '';
     
     modules.forEach(module => {
-        const card = createModuleCard(module);
+        const card = createModuleCard(module, subjectId);
         modulesGrid.appendChild(card);
     });
 }
 
 // 创建模块卡片
-function createModuleCard(module) {
+function createModuleCard(module, subjectId) {
     const card = document.createElement('div');
     card.className = 'module-card';
     card.innerHTML = `
@@ -235,9 +238,14 @@ function createModuleCard(module) {
     `;
     
     card.addEventListener('click', () => {
-        // 这里可以添加模块点击后的逻辑
-        console.log('点击模块:', module);
-        alert(`即将打开: ${module.name}\n功能开发中...`);
+        // 处理模块点击
+        if (module.id === 'vocabulary' && subjectId === 'english') {
+            // 单词学习模块
+            window.location.href = '/english/vocabulary';
+        } else {
+            console.log('点击模块:', module);
+            alert(`即将打开: ${module.name}\n功能开发中...`);
+        }
     });
     
     return card;
