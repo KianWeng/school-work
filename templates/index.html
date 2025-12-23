@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小学生学习平台</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>🌟 小学生学习平台</h1>
+            <p class="subtitle">快乐学习，健康成长</p>
+        </header>
+
+        <!-- 导航栏 -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-subject="all">全部</button>
+            <button class="nav-tab" data-subject="chinese">
+                <span class="icon">📚</span>
+                <span class="text">语文</span>
+            </button>
+            <button class="nav-tab" data-subject="math">
+                <span class="icon">🔢</span>
+                <span class="text">数学</span>
+            </button>
+            <button class="nav-tab" data-subject="english">
+                <span class="icon">🔤</span>
+                <span class="text">英语</span>
+            </button>
+            <button class="nav-tab" data-subject="science">
+                <span class="icon">🔬</span>
+                <span class="text">科学</span>
+            </button>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 学科卡片区域 -->
+            <div class="subjects-grid" id="subjectsGrid">
+                <!-- 学科卡片将通过JavaScript动态加载 -->
+            </div>
+
+            <!-- 学科详情区域 -->
+            <div class="subject-detail" id="subjectDetail" style="display: none;">
+                <button class="back-btn" id="backBtn">← 返回</button>
+                <div class="detail-header">
+                    <h2 id="detailTitle"></h2>
+                    <p id="detailDescription"></p>
+                </div>
+                <div class="modules-grid" id="modulesGrid">
+                    <!-- 模块卡片将通过JavaScript动态加载 -->
+                </div>
+            </div>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>&copy; 2024 小学生学习平台 | 让学习更有趣</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+
