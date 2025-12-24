@@ -12,7 +12,9 @@ import hashlib
 import os
 import re
 import json
+import requests
 from datetime import datetime, timedelta
+from io import BytesIO
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -22,6 +24,11 @@ app.config['JSON_AS_ASCII'] = False  # 支持中文JSON
 app.config['SECRET_KEY'] = os.urandom(24)  # 会话密钥
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'  # SQLite 数据库
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 禁用修改跟踪
+
+# 语音服务配置
+app.config['TTS_API_URL'] = os.getenv('TTS_API_URL', 'http://localhost:5050/v1/audio/speech')
+app.config['TTS_API_KEY'] = os.getenv('TTS_API_KEY', 'your_api_key_here')
+app.config['TTS_VOICE'] = os.getenv('TTS_VOICE', 'en-US-JennyNeural')  # 默认语音
 
 # 初始化数据库
 db = SQLAlchemy(app)
@@ -529,6 +536,122 @@ def get_word_stats():
         'mastered': mastered_count,
         'review': review_count
     })
+
+@app.route('/api/english/word/speech', methods=['POST'])
+@login_required
+def generate_speech():
+    """生成单词或句子的语音"""
+    data = request.get_json()
+    text = data.get('text', '').strip()
+    voice = data.get('voice', app.config['TTS_VOICE'])
+    speed = data.get('speed', 1.0)
+    
+    if not text:
+        return jsonify({'error': '文本不能为空'}), 400
+    
+    # 清理文本：移除音标符号和特殊字符
+    # 移除括号及其内容（词性描述等）
+    text = re.sub(r'\([^)]*\)', '', text)
+    # 移除 / 符号（用于音标标注和句子分隔）
+    text = text.replace('/', ' ')
+    # 移除多个连续空格
+    text = re.sub(r'\s+', ' ', text)
+    # 移除首尾空格
+    text = text.strip()
+    
+    if not text:
+        return jsonify({'error': '清理后的文本为空'}), 400
+    
+    # 记录请求信息（用于调试）
+    print(f'TTS请求: 原始文本={data.get("text", "")[:50]}, 清理后={text[:50]}, voice={voice}, url={app.config["TTS_API_URL"]}')
+    
+    try:
+        # 调用本地TTS API
+        response = requests.post(
+            app.config['TTS_API_URL'],
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f"Bearer {app.config['TTS_API_KEY']}"
+            },
+            json={
+                'input': text,
+                'voice': voice,
+                'response_format': 'mp3',
+                'speed': speed
+            },
+            timeout=10
+        )
+        
+        print(f'TTS响应状态码: {response.status_code}')
+        
+        if response.status_code == 200:
+            # 检查响应内容类型
+            content_type = response.headers.get('Content-Type', '')
+            print(f'TTS响应Content-Type: {content_type}')
+            
+            # 返回音频数据
+            return response.content, 200, {
+                'Content-Type': 'audio/mpeg',
+                'Content-Disposition': f'inline; filename="speech.mp3"',
+                'Cache-Control': 'no-cache'
+            }
+        else:
+            error_msg = f'TTS服务错误: {response.status_code}'
+            try:
+                error_detail = response.json() if response.text else '无详细信息'
+            except:
+                error_detail = response.text[:200] if response.text else '无详细信息'
+            
+            print(f'TTS错误: {error_msg}, 详情: {error_detail}')
+            return jsonify({
+                'error': error_msg,
+                'details': error_detail,
+                'status_code': response.status_code
+            }), response.status_code
+            
+    except requests.exceptions.ConnectionError as e:
+        error_msg = f'无法连接到TTS服务 ({app.config["TTS_API_URL"]})，请确保TTS服务正在运行'
+        print(f'TTS连接错误: {str(e)}')
+        return jsonify({'error': error_msg, 'type': 'connection_error'}), 500
+    except requests.exceptions.Timeout as e:
+        error_msg = 'TTS服务响应超时，请稍后重试'
+        print(f'TTS超时错误: {str(e)}')
+        return jsonify({'error': error_msg, 'type': 'timeout_error'}), 500
+    except requests.exceptions.RequestException as e:
+        error_msg = f'连接TTS服务失败: {str(e)}'
+        print(f'TTS请求错误: {str(e)}')
+        return jsonify({'error': error_msg, 'type': 'request_error'}), 500
+    except Exception as e:
+        error_msg = f'生成语音失败: {str(e)}'
+        print(f'TTS未知错误: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': error_msg, 'type': 'unknown_error'}), 500
+
+@app.route('/api/english/voices')
+@login_required
+def get_voices():
+    """获取可用的语音列表"""
+    voices = [
+        {'id': 'en-US-AnaNeural', 'name': 'Ana (Female)'},
+        {'id': 'en-US-AndrewMultilingualNeural', 'name': 'Andrew Multilingual (Male)'},
+        {'id': 'en-US-AndrewNeural', 'name': 'Andrew (Male)'},
+        {'id': 'en-US-AriaNeural', 'name': 'Aria (Female)'},
+        {'id': 'en-US-AvaMultilingualNeural', 'name': 'Ava Multilingual (Female)'},
+        {'id': 'en-US-AvaNeural', 'name': 'Ava (Female)'},
+        {'id': 'en-US-BrianMultilingualNeural', 'name': 'Brian Multilingual (Male)'},
+        {'id': 'en-US-BrianNeural', 'name': 'Brian (Male)'},
+        {'id': 'en-US-ChristopherNeural', 'name': 'Christopher (Male)'},
+        {'id': 'en-US-EmmaMultilingualNeural', 'name': 'Emma Multilingual (Female)'},
+        {'id': 'en-US-EmmaNeural', 'name': 'Emma (Female)'},
+        {'id': 'en-US-EricNeural', 'name': 'Eric (Male)'},
+        {'id': 'en-US-GuyNeural', 'name': 'Guy (Male)'},
+        {'id': 'en-US-JennyNeural', 'name': 'Jenny (Female)'},
+        {'id': 'en-US-MichelleNeural', 'name': 'Michelle (Female)'},
+        {'id': 'en-US-RogerNeural', 'name': 'Roger (Male)'},
+        {'id': 'en-US-SteffanNeural', 'name': 'Steffan (Male)'}
+    ]
+    return jsonify(voices)
 
 # 初始化数据库表
 def init_db():

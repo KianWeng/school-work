@@ -9,6 +9,8 @@ let stats = {
     mastered: 0,
     review: 0
 };
+let currentVoice = 'en-US-JennyNeural'; // 默认语音
+let currentAudio = null; // 当前播放的音频对象
 
 // DOM 元素
 const textbooksGrid = document.getElementById('textbooksGrid');
@@ -91,6 +93,7 @@ async function selectTextbook(textbookId) {
     
     await loadWords(textbookId);
     await loadStats(textbookId);
+    await loadVoices(); // 确保语音列表已加载
     renderLetterNav();
 }
 
@@ -201,23 +204,62 @@ function createWordCard(word) {
         'review': '需复习'
     };
     
+    // 转义HTML特殊字符，防止XSS
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+    
+    const wordEscaped = escapeHtml(word.word);
+    const phoneticEscaped = escapeHtml(word.phonetic || '');
+    const chineseEscaped = escapeHtml(word.chinese || '');
+    
+    // 处理例句：按 / 分割，每个句子单独显示
+    let exampleHtml = '';
+    if (word.example) {
+        const examples = word.example.split('/').map(e => e.trim()).filter(e => e);
+        if (examples.length > 0) {
+            exampleHtml = '<div class="word-examples">';
+            examples.forEach((example, index) => {
+                const exampleEscaped = escapeHtml(example);
+                // 转义单引号用于onclick
+                const exampleForJs = example.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                exampleHtml += `
+                    <div class="word-example-item">
+                        <span class="example-text">${exampleEscaped}</span>
+                        <button class="speech-btn speech-btn-small" onclick="playExampleSpeech('${exampleForJs}')" title="朗读例句">
+                            🔊
+                        </button>
+                    </div>
+                `;
+            });
+            exampleHtml += '</div>';
+        }
+    }
+    
     card.innerHTML = `
         <div class="word-header">
             <div class="word-title">
-                <div class="word-text">${word.word}</div>
-                <div class="word-phonetic">${word.phonetic || ''}</div>
+                <div class="word-text-container">
+                    <span class="word-text">${wordEscaped}</span>
+                    <button class="speech-btn" onclick="playWordSpeech('${wordEscaped.replace(/'/g, "\\'")}')" title="朗读单词">
+                        🔊
+                    </button>
+                </div>
+                <div class="word-phonetic">${phoneticEscaped}</div>
             </div>
             <span class="word-status status-${status}">${statusText[status] || '新词'}</span>
         </div>
         <div class="word-info">
             ${word.part_of_speech ? `<span class="word-pos">${word.part_of_speech}</span>` : ''}
-            <div class="word-chinese">${word.chinese || ''}</div>
-            ${word.example ? `<div class="word-example">${word.example}</div>` : ''}
+            <div class="word-chinese">${chineseEscaped}</div>
+            ${exampleHtml}
         </div>
         <div class="word-actions">
-            ${status !== 'learning' ? `<button class="action-btn learning" onclick="updateWordStatus('${word.word}', 'learning')">标记为学习中</button>` : ''}
-            ${status !== 'mastered' ? `<button class="action-btn mastered" onclick="updateWordStatus('${word.word}', 'mastered')">标记为已掌握</button>` : ''}
-            ${status !== 'review' ? `<button class="action-btn review" onclick="updateWordStatus('${word.word}', 'review')">标记为需复习</button>` : ''}
+            ${status !== 'learning' ? `<button class="action-btn learning" onclick="updateWordStatus('${wordEscaped.replace(/'/g, "\\'")}', 'learning')">标记为学习中</button>` : ''}
+            ${status !== 'mastered' ? `<button class="action-btn mastered" onclick="updateWordStatus('${wordEscaped.replace(/'/g, "\\'")}', 'mastered')">标记为已掌握</button>` : ''}
+            ${status !== 'review' ? `<button class="action-btn review" onclick="updateWordStatus('${wordEscaped.replace(/'/g, "\\'")}', 'review')">标记为需复习</button>` : ''}
         </div>
     `;
     
@@ -282,7 +324,181 @@ function backToTextbooks() {
     }
 }
 
+// 播放单词发音
+async function playWordSpeech(text) {
+    await playSpeech(text);
+}
+
+// 播放例句发音
+async function playExampleSpeech(text) {
+    await playSpeech(text);
+}
+
+// 播放语音
+async function playSpeech(text) {
+    try {
+        // 停止当前播放的音频
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+        }
+        
+        console.log('请求播放语音:', text);
+        
+        // 调用后端API生成语音
+        const response = await fetch('/api/english/word/speech', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                text: text,
+                voice: currentVoice,
+                speed: 1.0
+            })
+        });
+        
+        console.log('TTS响应状态:', response.status, response.statusText);
+        
+        if (response.ok) {
+            // 检查响应类型
+            const contentType = response.headers.get('Content-Type');
+            console.log('响应Content-Type:', contentType);
+            
+            if (contentType && contentType.includes('audio')) {
+                // 获取音频blob
+                const audioBlob = await response.blob();
+                console.log('音频Blob大小:', audioBlob.size, 'bytes');
+                
+                if (audioBlob.size === 0) {
+                    alert('TTS服务返回了空音频，请检查TTS服务配置');
+                    return;
+                }
+                
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // 创建音频对象并播放
+                currentAudio = new Audio(audioUrl);
+                
+                currentAudio.onloadeddata = () => {
+                    console.log('音频加载完成，开始播放');
+                };
+                
+                currentAudio.onerror = (e) => {
+                    console.error('音频播放失败:', e);
+                    alert('音频播放失败，请检查音频格式');
+                    URL.revokeObjectURL(audioUrl);
+                    currentAudio = null;
+                };
+                
+                try {
+                    await currentAudio.play();
+                    console.log('音频播放成功');
+                } catch (playError) {
+                    console.error('播放错误:', playError);
+                    alert('无法播放音频，可能是浏览器权限问题');
+                    URL.revokeObjectURL(audioUrl);
+                    currentAudio = null;
+                }
+                
+                // 播放结束后清理
+                currentAudio.onended = () => {
+                    console.log('音频播放结束');
+                    URL.revokeObjectURL(audioUrl);
+                    currentAudio = null;
+                };
+            } else {
+                // 响应不是音频，可能是错误信息
+                const errorData = await response.json();
+                console.error('TTS错误响应:', errorData);
+                alert(`TTS错误: ${errorData.error || '未知错误'}\n${errorData.details || ''}`);
+            }
+        } else {
+            // 尝试解析错误信息
+            let errorMessage = `HTTP错误: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+                if (errorData.details) {
+                    errorMessage += `\n详情: ${errorData.details}`;
+                }
+                console.error('TTS API错误:', errorData);
+            } catch (e) {
+                const errorText = await response.text();
+                errorMessage = errorText || errorMessage;
+                console.error('TTS错误响应文本:', errorText);
+            }
+            
+            // 根据错误类型显示不同的提示
+            if (response.status === 500) {
+                alert(`TTS服务错误:\n${errorMessage}\n\n请检查:\n1. TTS服务是否运行在 http://localhost:5050\n2. API密钥是否正确配置`);
+            } else {
+                alert(`播放失败: ${errorMessage}`);
+            }
+        }
+    } catch (error) {
+        console.error('播放语音失败:', error);
+        alert(`网络错误: ${error.message}\n\n请检查:\n1. 网络连接是否正常\n2. TTS服务是否可访问`);
+    }
+}
+
+// 加载可用语音列表
+async function loadVoices() {
+    try {
+        const response = await fetch('/api/english/voices', {
+            credentials: 'same-origin'
+        });
+        if (response.ok) {
+            const voices = await response.json();
+            const voiceSelect = document.getElementById('voiceSelect');
+            if (voiceSelect) {
+                voiceSelect.innerHTML = '';
+                voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.id;
+                    option.textContent = voice.name;
+                    if (voice.id === currentVoice) {
+                        option.selected = true;
+                    }
+                    voiceSelect.appendChild(option);
+                });
+                
+                // 添加选择事件监听
+                voiceSelect.addEventListener('change', (e) => {
+                    currentVoice = e.target.value;
+                    console.log('语音已切换为:', currentVoice);
+                    // 可以在这里添加提示或保存到本地存储
+                    localStorage.setItem('selectedVoice', currentVoice);
+                });
+                
+                // 从本地存储恢复之前选择的语音
+                const savedVoice = localStorage.getItem('selectedVoice');
+                if (savedVoice && voices.find(v => v.id === savedVoice)) {
+                    currentVoice = savedVoice;
+                    voiceSelect.value = savedVoice;
+                }
+            }
+        } else {
+            console.error('加载语音列表失败:', response.status);
+        }
+    } catch (error) {
+        console.error('加载语音列表失败:', error);
+        const voiceSelect = document.getElementById('voiceSelect');
+        if (voiceSelect) {
+            voiceSelect.innerHTML = '<option value="">加载失败</option>';
+        }
+    }
+}
+
+// 初始化时加载语音列表
+document.addEventListener('DOMContentLoaded', () => {
+    loadVoices();
+});
+
 // 全局函数，供HTML调用
 window.updateWordStatus = updateWordStatus;
 window.backToTextbooks = backToTextbooks;
+window.playWordSpeech = playWordSpeech;
+window.playExampleSpeech = playExampleSpeech;
 

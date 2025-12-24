@@ -63,6 +63,46 @@
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
+.voice-selector {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.voice-selector label {
+    font-weight: bold;
+    color: #333;
+    font-size: 0.95em;
+}
+
+.voice-select {
+    flex: 1;
+    min-width: 250px;
+    padding: 10px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95em;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.voice-select:hover {
+    border-color: #667eea;
+}
+
+.voice-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 .stats-bar {
     display: flex;
     justify-content: space-around;
@@ -200,11 +240,18 @@
     flex: 1;
 }
 
+.word-text-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .word-text {
     font-size: 1.3em;
     font-weight: bold;
     color: #333;
     margin-bottom: 5px;
+    flex: 1;
 }
 
 .word-phonetic {
@@ -260,14 +307,29 @@
     margin-top: 8px;
 }
 
-.word-example {
+.word-examples {
     margin-top: 10px;
+}
+
+.word-example-item {
+    margin-top: 8px;
     padding: 10px;
     background: white;
     border-radius: 8px;
     font-size: 0.9em;
     color: #666;
     border-left: 3px solid #667eea;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.word-example-item:first-child {
+    margin-top: 0;
+}
+
+.example-text {
+    flex: 1;
 }
 
 .word-actions {
@@ -311,6 +373,38 @@
 
 .action-btn.review:hover {
     background: #e95f8a;
+}
+
+/* 发音按钮样式 */
+.speech-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.speech-btn:hover {
+    background: #764ba2;
+    transform: scale(1.1);
+}
+
+.speech-btn:active {
+    transform: scale(0.95);
+}
+
+.speech-btn-small {
+    width: 24px;
+    height: 24px;
+    font-size: 0.8em;
 }
 
 /* 响应式设计 */
