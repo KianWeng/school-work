@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词练习 - 小学生学习平台</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/practice.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>✏️ 单词练习</h1>
+            <div class="header-actions">
+                <button class="back-btn" onclick="window.location.href='/english/wrong-answers'">📝 错题库</button>
+                <button class="back-btn" onclick="window.location.href='/english/vocabulary'">← 返回单词学习</button>
+                <button class="back-btn" onclick="window.location.href='/'">← 返回首页</button>
+            </div>
+        </header>
+
+        <!-- 练习设置 -->
+        <div class="practice-settings">
+            <div class="setting-group">
+                <label>选择教材：</label>
+                <select id="textbookSelect" class="setting-select">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>练习模式：</label>
+                <select id="practiceMode" class="setting-select">
+                    <option value="chinese_to_english">中文→英文（输入）</option>
+                    <option value="english_to_chinese">英文→中文（选择）</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>练习数量：</label>
+                <select id="practiceCount" class="setting-select">
+                    <option value="10">10题</option>
+                    <option value="20" selected>20题</option>
+                    <option value="30">30题</option>
+                    <option value="50">50题</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>字母范围：</label>
+                <select id="letterRange" class="setting-select">
+                    <option value="ALL">全部字母</option>
+                </select>
+            </div>
+            <button class="start-btn" id="startBtn" onclick="startPractice()">开始练习</button>
+        </div>
+
+        <!-- 练习区域 -->
+        <div class="practice-content" id="practiceContent" style="display: none;">
+            <!-- 进度条 -->
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+                <div class="progress-text" id="progressText">1 / 20</div>
+            </div>
+
+            <!-- 题目区域 -->
+            <div class="question-area" id="questionArea">
+                <!-- 题目内容将通过JavaScript动态生成 -->
+            </div>
+
+            <!-- 答案区域 -->
+            <div class="answer-area" id="answerArea">
+                <!-- 答案输入/选择区域 -->
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+                <button class="action-btn submit-btn" id="submitBtn" onclick="submitAnswer()" disabled>提交答案</button>
+                <button class="action-btn skip-btn" id="skipBtn" onclick="skipQuestion()">跳过</button>
+            </div>
+
+            <!-- 结果反馈 -->
+            <div class="feedback-area" id="feedbackArea" style="display: none;">
+                <!-- 反馈信息 -->
+            </div>
+        </div>
+
+        <!-- 练习结果 -->
+        <div class="practice-result" id="practiceResult" style="display: none;">
+            <h2>练习完成！</h2>
+            <div class="result-stats">
+                <div class="stat-item">
+                    <span class="stat-label">总题数</span>
+                    <span class="stat-value" id="totalQuestions">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">正确</span>
+                    <span class="stat-value correct" id="correctCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">错误</span>
+                    <span class="stat-value wrong" id="wrongCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">正确率</span>
+                    <span class="stat-value" id="accuracy">0%</span>
+                </div>
+            </div>
+            <div class="result-actions">
+                <button class="action-btn" onclick="restartPractice()">再来一次</button>
+                <button class="action-btn" onclick="window.location.href='/english/practice'">返回单词练习</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/practice.js') }}"></script>
+</body>
+</html>
+

@@ -84,6 +84,29 @@ class WordProgress(db.Model):
     def __repr__(self):
         return f'<WordProgress {self.user_id}:{self.word}:{self.textbook}>'
 
+# 错题记录模型
+class WrongAnswer(db.Model):
+    __tablename__ = 'wrong_answers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(20), db.ForeignKey('users.username'), nullable=False, index=True)
+    word = db.Column(db.String(100), nullable=False, index=True)
+    phonetic = db.Column(db.String(200), nullable=True)
+    chinese = db.Column(db.String(200), nullable=False)
+    textbook = db.Column(db.String(50), nullable=False, index=True)
+    practice_mode = db.Column(db.String(50), nullable=False)  # chinese_to_english 或 english_to_chinese
+    user_answer = db.Column(db.String(200), nullable=True)  # 用户的错误答案
+    correct_answer = db.Column(db.String(200), nullable=False)  # 正确答案
+    error_count = db.Column(db.Integer, default=1)  # 错误次数
+    last_error_time = db.Column(db.DateTime, default=datetime.utcnow)  # 最近错误时间
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (db.Index('idx_user_word_mode', 'user_id', 'word', 'practice_mode'),)
+    
+    def __repr__(self):
+        return f'<WrongAnswer {self.user_id}:{self.word}:{self.practice_mode}>'
+
 def login_required(f):
     """登录验证装饰器"""
     @wraps(f)
@@ -283,6 +306,7 @@ def get_subject_modules(subject_id):
         ],
         'english': [
             {'id': 'vocabulary', 'name': '单词学习', 'description': '学习英语单词', 'icon': '📖'},
+            {'id': 'practice', 'name': '单词练习', 'description': '练习单词记忆', 'icon': '✏️'},
             {'id': 'grammar', 'name': '语法练习', 'description': '练习英语语法', 'icon': '📝'},
             {'id': 'listening', 'name': '听力训练', 'description': '提高听力水平', 'icon': '🎧'},
             {'id': 'speaking', 'name': '口语练习', 'description': '练习英语口语', 'icon': '🗣️'}
@@ -307,6 +331,18 @@ def get_subject_modules(subject_id):
 def vocabulary_page():
     """单词学习页面"""
     return render_template('vocabulary.html')
+
+@app.route('/english/practice')
+@login_required
+def practice_page():
+    """单词练习页面"""
+    return render_template('practice.html')
+
+@app.route('/english/wrong-answers')
+@login_required
+def wrong_answers_page():
+    """错题库页面"""
+    return render_template('wrong_answers.html')
 
 @app.route('/api/english/textbooks')
 @login_required
