@@ -65,11 +65,29 @@
                 <!-- 字母按钮将通过JavaScript动态加载 -->
             </div>
 
-            <!-- 单词列表 -->
-            <div class="words-container">
-                <div class="words-list" id="wordsList">
-                    <!-- 单词卡片将通过JavaScript动态加载 -->
+            <!-- 单词显示区域 -->
+            <div class="word-display-container">
+                <!-- 导航按钮 -->
+                <button class="nav-word-btn prev-btn" id="prevWordBtn" onclick="showPreviousWord()" title="上一个单词">
+                    ←
+                </button>
+                
+                <!-- 单词卡片容器 -->
+                <div class="word-card-container" id="wordCardContainer">
+                    <div class="word-card-wrapper" id="wordCardWrapper">
+                        <!-- 单词卡片将通过JavaScript动态加载 -->
+                    </div>
                 </div>
+                
+                <!-- 导航按钮 -->
+                <button class="nav-word-btn next-btn" id="nextWordBtn" onclick="showNextWord()" title="下一个单词">
+                    →
+                </button>
+            </div>
+            
+            <!-- 单词计数器 -->
+            <div class="word-counter">
+                <span id="currentWordIndex">0</span> / <span id="totalWordCount">0</span>
             </div>
         </div>
     </div>

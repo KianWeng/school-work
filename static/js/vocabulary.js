@@ -1,6 +1,8 @@
 // 单词学习页面JavaScript
 let currentTextbook = null;
 let allWords = [];
+let filteredWords = []; // 当前过滤后的单词列表
+let currentWordIndex = 0; // 当前显示的单词索引
 let currentLetter = 'ALL';
 let stats = {
     total: 0,
@@ -12,16 +14,102 @@ let stats = {
 let currentVoice = 'en-US-JennyNeural'; // 默认语音
 let currentAudio = null; // 当前播放的音频对象
 
+// 触摸滑动相关
+let touchStartX = 0;
+let touchEndX = 0;
+let isDragging = false;
+
 // DOM 元素
 const textbooksGrid = document.getElementById('textbooksGrid');
 const vocabularyContent = document.getElementById('vocabularyContent');
 const letterNav = document.getElementById('letterNav');
-const wordsList = document.getElementById('wordsList');
+const wordCardWrapper = document.getElementById('wordCardWrapper');
+const currentWordIndexEl = document.getElementById('currentWordIndex');
+const totalWordCountEl = document.getElementById('totalWordCount');
+const prevWordBtn = document.getElementById('prevWordBtn');
+const nextWordBtn = document.getElementById('nextWordBtn');
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadTextbooks();
+    setupSwipeHandlers();
 });
+
+// 设置滑动处理
+function setupSwipeHandlers() {
+    const container = document.getElementById('wordCardContainer');
+    if (!container) return;
+    
+    // 触摸事件
+    container.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        isDragging = false;
+    }, { passive: true });
+    
+    container.addEventListener('touchmove', (e) => {
+        isDragging = true;
+    }, { passive: true });
+    
+    container.addEventListener('touchend', (e) => {
+        if (!isDragging) return;
+        touchEndX = e.changedTouches[0].clientX;
+        handleSwipe();
+    }, { passive: true });
+    
+    // 鼠标事件（用于桌面端拖拽）
+    let mouseStartX = 0;
+    let mouseIsDown = false;
+    
+    container.addEventListener('mousedown', (e) => {
+        mouseStartX = e.clientX;
+        mouseIsDown = true;
+        container.style.cursor = 'grabbing';
+    });
+    
+    container.addEventListener('mousemove', (e) => {
+        if (!mouseIsDown) return;
+        isDragging = true;
+    });
+    
+    container.addEventListener('mouseup', (e) => {
+        if (mouseIsDown && isDragging) {
+            const mouseEndX = e.clientX;
+            const diff = mouseStartX - mouseEndX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) {
+                    showNextWord();
+                } else {
+                    showPreviousWord();
+                }
+            }
+        }
+        mouseIsDown = false;
+        isDragging = false;
+        container.style.cursor = 'default';
+    });
+    
+    container.addEventListener('mouseleave', () => {
+        mouseIsDown = false;
+        isDragging = false;
+        container.style.cursor = 'default';
+    });
+}
+
+// 处理滑动
+function handleSwipe() {
+    const diff = touchStartX - touchEndX;
+    const minSwipeDistance = 50;
+    
+    if (Math.abs(diff) > minSwipeDistance) {
+        if (diff > 0) {
+            // 向左滑动，显示下一个
+            showNextWord();
+        } else {
+            // 向右滑动，显示上一个
+            showPreviousWord();
+        }
+    }
+}
 
 // 加载教材列表
 async function loadTextbooks() {
@@ -163,7 +251,7 @@ function renderLetterNav() {
         btn.addEventListener('click', () => {
             currentLetter = letter;
             renderLetterNav();
-            renderWords();
+            renderWords(); // 这会重置索引并显示第一个单词
         });
         letterNav.appendChild(btn);
     });
@@ -171,24 +259,77 @@ function renderLetterNav() {
 
 // 渲染单词列表
 function renderWords() {
-    let filteredWords = allWords;
-    
     // 按字母过滤
     if (currentLetter !== 'ALL') {
         filteredWords = allWords.filter(word => word.letter === currentLetter);
+    } else {
+        filteredWords = allWords;
     }
     
-    wordsList.innerHTML = '';
+    // 重置索引
+    currentWordIndex = 0;
     
+    // 更新计数器
+    updateWordCounter();
+    
+    // 显示当前单词
+    showCurrentWord();
+    
+    // 更新导航按钮状态
+    updateNavButtons();
+}
+
+// 显示当前单词
+function showCurrentWord() {
     if (filteredWords.length === 0) {
-        wordsList.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">暂无单词</p>';
+        wordCardWrapper.innerHTML = '<div class="word-card"><p style="text-align: center; color: #666; padding: 40px;">暂无单词</p></div>';
         return;
     }
     
-    filteredWords.forEach(word => {
-        const card = createWordCard(word);
-        wordsList.appendChild(card);
-    });
+    const word = filteredWords[currentWordIndex];
+    const card = createWordCard(word);
+    wordCardWrapper.innerHTML = '';
+    wordCardWrapper.appendChild(card);
+}
+
+// 显示上一个单词
+function showPreviousWord() {
+    if (currentWordIndex > 0) {
+        currentWordIndex--;
+        showCurrentWord();
+        updateWordCounter();
+        updateNavButtons();
+    }
+}
+
+// 显示下一个单词
+function showNextWord() {
+    if (currentWordIndex < filteredWords.length - 1) {
+        currentWordIndex++;
+        showCurrentWord();
+        updateWordCounter();
+        updateNavButtons();
+    }
+}
+
+// 更新单词计数器
+function updateWordCounter() {
+    if (currentWordIndexEl) {
+        currentWordIndexEl.textContent = filteredWords.length > 0 ? currentWordIndex + 1 : 0;
+    }
+    if (totalWordCountEl) {
+        totalWordCountEl.textContent = filteredWords.length;
+    }
+}
+
+// 更新导航按钮状态
+function updateNavButtons() {
+    if (prevWordBtn) {
+        prevWordBtn.disabled = currentWordIndex === 0;
+    }
+    if (nextWordBtn) {
+        nextWordBtn.disabled = currentWordIndex >= filteredWords.length - 1;
+    }
 }
 
 // 创建单词卡片
@@ -501,4 +642,6 @@ window.updateWordStatus = updateWordStatus;
 window.backToTextbooks = backToTextbooks;
 window.playWordSpeech = playWordSpeech;
 window.playExampleSpeech = playExampleSpeech;
+window.showPreviousWord = showPreviousWord;
+window.showNextWord = showNextWord;
 

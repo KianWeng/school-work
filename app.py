@@ -19,16 +19,23 @@ from io import BytesIO
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
-# 配置
-app.config['JSON_AS_ASCII'] = False  # 支持中文JSON
-app.config['SECRET_KEY'] = os.urandom(24)  # 会话密钥
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'  # SQLite 数据库
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 禁用修改跟踪
-
-# 语音服务配置
-app.config['TTS_API_URL'] = os.getenv('TTS_API_URL', 'http://localhost:5050/v1/audio/speech')
-app.config['TTS_API_KEY'] = os.getenv('TTS_API_KEY', 'your_api_key_here')
-app.config['TTS_VOICE'] = os.getenv('TTS_VOICE', 'en-US-JennyNeural')  # 默认语音
+# 加载配置
+try:
+    from config import get_config
+    config_class = get_config()
+    app.config.from_object(config_class)
+    print(f'✓ 已加载配置: {config_class.__name__}')
+except ImportError:
+    # 如果没有配置文件，使用默认配置
+    print('⚠ 警告: 未找到配置文件 config.py，使用默认配置')
+    print('  提示: 可以复制 config.example.py 为 config.py 并修改配置')
+    app.config['JSON_AS_ASCII'] = False
+    app.config['SECRET_KEY'] = os.urandom(24).hex()
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['TTS_API_URL'] = os.getenv('TTS_API_URL', 'http://localhost:5050/v1/audio/speech')
+    app.config['TTS_API_KEY'] = os.getenv('TTS_API_KEY', 'your_api_key_here')
+    app.config['TTS_VOICE'] = os.getenv('TTS_VOICE', 'en-US-JennyNeural')
 
 # 初始化数据库
 db = SQLAlchemy(app)
@@ -674,5 +681,13 @@ def init_db():
 if __name__ == '__main__':
     # 初始化数据库
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=50000)
+    
+    # 从配置获取服务器设置
+    host = app.config.get('HOST', '0.0.0.0')
+    port = app.config.get('PORT', 50000)
+    debug = app.config.get('DEBUG', True)
+    
+    print(f'🚀 启动服务器: http://{host}:{port}')
+    print(f'📝 调试模式: {debug}')
+    app.run(debug=debug, host=host, port=port)
 
