@@ -696,6 +696,135 @@ def get_voices():
     ]
     return jsonify(voices)
 
+# ==================== 错题相关路由 ====================
+
+@app.route('/api/english/wrong-answer', methods=['POST'])
+@login_required
+def save_wrong_answer():
+    """保存错题"""
+    username = session.get('user_id')
+    data = request.get_json()
+    
+    word = data.get('word')
+    phonetic = data.get('phonetic', '')
+    chinese = data.get('chinese', '')
+    textbook = data.get('textbook')
+    practice_mode = data.get('practice_mode')  # chinese_to_english 或 english_to_chinese
+    user_answer = data.get('user_answer', '')
+    correct_answer = data.get('correct_answer', '')
+    
+    if not word or not textbook or not practice_mode or not correct_answer:
+        return jsonify({'error': '参数不完整'}), 400
+    
+    try:
+        # 查找是否已有该错题记录
+        wrong_answer = WrongAnswer.query.filter_by(
+            user_id=username,
+            word=word,
+            textbook=textbook,
+            practice_mode=practice_mode
+        ).first()
+        
+        if wrong_answer:
+            # 更新错误次数和最近错误时间
+            wrong_answer.error_count += 1
+            wrong_answer.last_error_time = datetime.utcnow()
+            wrong_answer.user_answer = user_answer
+            wrong_answer.updated_at = datetime.utcnow()
+        else:
+            # 创建新的错题记录
+            wrong_answer = WrongAnswer(
+                user_id=username,
+                word=word,
+                phonetic=phonetic,
+                chinese=chinese,
+                textbook=textbook,
+                practice_mode=practice_mode,
+                user_answer=user_answer,
+                correct_answer=correct_answer,
+                error_count=1,
+                last_error_time=datetime.utcnow()
+            )
+            db.session.add(wrong_answer)
+        
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '错题已保存',
+            'error_count': wrong_answer.error_count
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'保存错题失败: {str(e)}')
+        return jsonify({'error': f'保存错题失败: {str(e)}'}), 500
+
+@app.route('/api/english/wrong-answers')
+@login_required
+def get_wrong_answers():
+    """获取用户的错题列表"""
+    username = session.get('user_id')
+    textbook = request.args.get('textbook', '')
+    practice_mode = request.args.get('practice_mode', '')
+    
+    try:
+        query = WrongAnswer.query.filter_by(user_id=username)
+        
+        if textbook:
+            query = query.filter_by(textbook=textbook)
+        if practice_mode:
+            query = query.filter_by(practice_mode=practice_mode)
+        
+        # 按最近错误时间倒序排列
+        wrong_answers = query.order_by(WrongAnswer.last_error_time.desc()).all()
+        
+        result = []
+        for wa in wrong_answers:
+            result.append({
+                'id': wa.id,
+                'word': wa.word,
+                'phonetic': wa.phonetic,
+                'chinese': wa.chinese,
+                'textbook': wa.textbook,
+                'practice_mode': wa.practice_mode,
+                'user_answer': wa.user_answer,
+                'correct_answer': wa.correct_answer,
+                'error_count': wa.error_count,
+                'last_error_time': wa.last_error_time.isoformat() if wa.last_error_time else None,
+                'created_at': wa.created_at.isoformat() if wa.created_at else None
+            })
+        
+        return jsonify({
+            'total': len(result),
+            'wrong_answers': result
+        })
+    except Exception as e:
+        app.logger.error(f'获取错题列表失败: {str(e)}')
+        return jsonify({'error': f'获取错题列表失败: {str(e)}'}), 500
+
+@app.route('/api/english/wrong-answer/<int:wrong_id>', methods=['DELETE'])
+@login_required
+def delete_wrong_answer(wrong_id):
+    """删除错题"""
+    username = session.get('user_id')
+    
+    try:
+        wrong_answer = WrongAnswer.query.filter_by(
+            id=wrong_id,
+            user_id=username
+        ).first()
+        
+        if not wrong_answer:
+            return jsonify({'error': '错题不存在'}), 404
+        
+        db.session.delete(wrong_answer)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': '错题已删除'})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'删除错题失败: {str(e)}')
+        return jsonify({'error': f'删除错题失败: {str(e)}'}), 500
+
 # 初始化数据库表
 def init_db():
     """初始化数据库"""

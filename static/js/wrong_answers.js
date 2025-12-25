@@ -2,6 +2,7 @@
 
 let allWrongAnswers = [];
 let filteredWrongAnswers = [];
+let currentWrongAnswerIndex = 0;
 
 // DOM元素
 const textbookFilter = document.getElementById('textbookFilter');
@@ -10,12 +11,139 @@ const wrongAnswersList = document.getElementById('wrongAnswersList');
 const emptyState = document.getElementById('emptyState');
 const totalCountEl = document.getElementById('totalCount');
 const totalErrorsEl = document.getElementById('totalErrors');
+const wrongAnswerNav = document.getElementById('wrongAnswerNav');
+const wrongAnswerControls = document.getElementById('wrongAnswerControls');
+const currentIndexEl = document.getElementById('currentIndex');
+const totalCountNavEl = document.getElementById('totalCount');
+const prevNavBtn = document.getElementById('prevNavBtn');
+const nextNavBtn = document.getElementById('nextNavBtn');
+
+// 滑动相关变量
+let touchStartX = 0;
+let touchEndX = 0;
+let touchStartY = 0;
+let touchEndY = 0;
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadTextbooks();
     loadWrongAnswers();
+    
+    // 添加键盘快捷键
+    document.addEventListener('keydown', handleWrongAnswerKeyboard);
+    
+    // 添加触摸滑动支持（在容器上）
+    const container = document.getElementById('wrongAnswerCardContainer');
+    if (container) {
+        setupSwipeListeners(container);
+    }
 });
+
+// 处理键盘快捷键
+function handleWrongAnswerKeyboard(e) {
+    if (emptyState && emptyState.style.display === 'block') return;
+    
+    switch(e.key) {
+        case 'ArrowLeft':
+            e.preventDefault();
+            showPreviousWrongAnswer();
+            break;
+        case 'ArrowRight':
+            e.preventDefault();
+            showNextWrongAnswer();
+            break;
+    }
+}
+
+// 设置滑动监听器
+function setupSwipeListeners(element) {
+    element.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+    
+    element.addEventListener('touchmove', (e) => {
+        // 允许默认滚动行为，但阻止垂直滚动时的水平滑动
+        const currentX = e.changedTouches[0].screenX;
+        const currentY = e.changedTouches[0].screenY;
+        const diffX = Math.abs(currentX - touchStartX);
+        const diffY = Math.abs(currentY - touchStartY);
+        
+        // 如果主要是水平滑动，阻止默认行为
+        if (diffX > diffY && diffX > 10) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    element.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, { passive: true });
+    
+    // 鼠标拖动支持（桌面端）
+    let isDragging = false;
+    let mouseStartX = 0;
+    
+    element.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        mouseStartX = e.clientX;
+        element.style.cursor = 'grabbing';
+    });
+    
+    element.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            e.preventDefault();
+        }
+    });
+    
+    element.addEventListener('mouseup', (e) => {
+        if (isDragging) {
+            const mouseEndX = e.clientX;
+            const diff = mouseStartX - mouseEndX;
+            const swipeThreshold = 50;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    showNextWrongAnswer();
+                } else {
+                    showPreviousWrongAnswer();
+                }
+            }
+            
+            isDragging = false;
+            element.style.cursor = 'grab';
+        }
+    });
+    
+    element.addEventListener('mouseleave', () => {
+        if (isDragging) {
+            isDragging = false;
+            element.style.cursor = 'grab';
+        }
+    });
+    
+    // 设置初始光标样式
+    element.style.cursor = 'grab';
+}
+
+// 处理滑动
+function handleSwipe() {
+    const swipeThreshold = 50;
+    const diffX = touchStartX - touchEndX;
+    const diffY = Math.abs(touchStartY - touchEndY);
+    
+    // 确保主要是水平滑动（水平距离大于垂直距离）
+    if (Math.abs(diffX) > swipeThreshold && Math.abs(diffX) > diffY) {
+        if (diffX > 0) {
+            // 向左滑动，显示下一个
+            showNextWrongAnswer();
+        } else {
+            // 向右滑动，显示上一个
+            showPreviousWrongAnswer();
+        }
+    }
+}
 
 // 加载教材列表
 async function loadTextbooks() {
@@ -83,18 +211,67 @@ function renderWrongAnswers() {
     if (filteredWrongAnswers.length === 0) {
         wrongAnswersList.style.display = 'none';
         emptyState.style.display = 'block';
+        if (wrongAnswerNav) wrongAnswerNav.style.display = 'none';
+        if (wrongAnswerControls) wrongAnswerControls.style.display = 'none';
         return;
     }
     
-    wrongAnswersList.style.display = 'grid';
+    wrongAnswersList.style.display = 'flex';
     emptyState.style.display = 'none';
+    if (wrongAnswerNav) wrongAnswerNav.style.display = 'block';
+    if (wrongAnswerControls) wrongAnswerControls.style.display = 'flex';
     
     wrongAnswersList.innerHTML = '';
     
-    filteredWrongAnswers.forEach(wrongAnswer => {
+    // 创建所有卡片
+    filteredWrongAnswers.forEach((wrongAnswer, index) => {
         const card = createWrongAnswerCard(wrongAnswer);
         wrongAnswersList.appendChild(card);
+        
+        // 为每个卡片也添加滑动监听
+        setupSwipeListeners(card);
     });
+    
+    // 重置到第一张卡片
+    currentWrongAnswerIndex = 0;
+    showWrongAnswer(0);
+}
+
+// 显示指定索引的错题
+function showWrongAnswer(index) {
+    if (filteredWrongAnswers.length === 0) return;
+    
+    // 确保索引在有效范围内
+    if (index < 0) index = 0;
+    if (index >= filteredWrongAnswers.length) index = filteredWrongAnswers.length - 1;
+    
+    currentWrongAnswerIndex = index;
+    
+    // 移动卡片容器
+    const translateX = -index * 100;
+    wrongAnswersList.style.transform = `translateX(${translateX}%)`;
+    
+    // 更新导航指示
+    if (currentIndexEl) currentIndexEl.textContent = index + 1;
+    if (totalCountNavEl) totalCountNavEl.textContent = filteredWrongAnswers.length;
+    
+    // 更新按钮状态
+    if (prevNavBtn) prevNavBtn.disabled = index === 0;
+    if (nextNavBtn) nextNavBtn.disabled = index === filteredWrongAnswers.length - 1;
+}
+
+// 显示上一个错题
+function showPreviousWrongAnswer() {
+    if (currentWrongAnswerIndex > 0) {
+        showWrongAnswer(currentWrongAnswerIndex - 1);
+    }
+}
+
+// 显示下一个错题
+function showNextWrongAnswer() {
+    if (currentWrongAnswerIndex < filteredWrongAnswers.length - 1) {
+        showWrongAnswer(currentWrongAnswerIndex + 1);
+    }
 }
 
 // 创建错题卡片
@@ -127,12 +304,51 @@ function createWrongAnswerCard(wrongAnswer) {
             <div class="practice-mode">练习模式：${modeText}</div>
         </div>
         <div class="card-actions">
-            <button class="action-btn-small delete-btn" onclick="deleteWrongAnswer(${wrongAnswer.id})">删除</button>
+            <button class="action-btn-small mastered-btn" onclick="markAsMastered(${wrongAnswer.id})">已掌握</button>
             <button class="action-btn-small practice-btn" onclick="practiceThisWord('${escapeHtml(wrongAnswer.word).replace(/'/g, "\\'")}')">练习</button>
+            <button class="action-btn-small delete-btn" onclick="deleteWrongAnswer(${wrongAnswer.id})">删除</button>
         </div>
     `;
     
     return card;
+}
+
+// 标记为已掌握（删除错题）
+async function markAsMastered(wrongId) {
+    if (!confirm('确定已掌握这个单词了吗？将从错题库中移除。')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/english/wrong-answer/${wrongId}`, {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        });
+        
+        if (response.ok) {
+            // 从列表中移除
+            const removedIndex = filteredWrongAnswers.findIndex(wa => wa.id === wrongId);
+            filteredWrongAnswers = filteredWrongAnswers.filter(wa => wa.id !== wrongId);
+            allWrongAnswers = allWrongAnswers.filter(wa => wa.id !== wrongId);
+            
+            updateStats();
+            
+            // 如果删除的是当前显示的卡片，调整索引
+            if (removedIndex <= currentWrongAnswerIndex && currentWrongAnswerIndex > 0) {
+                currentWrongAnswerIndex--;
+            }
+            if (currentWrongAnswerIndex >= filteredWrongAnswers.length && filteredWrongAnswers.length > 0) {
+                currentWrongAnswerIndex = filteredWrongAnswers.length - 1;
+            }
+            
+            renderWrongAnswers();
+        } else {
+            alert('操作失败');
+        }
+    } catch (error) {
+        console.error('标记已掌握异常:', error);
+        alert('操作失败');
+    }
 }
 
 // 删除错题
@@ -149,10 +365,20 @@ async function deleteWrongAnswer(wrongId) {
         
         if (response.ok) {
             // 从列表中移除
+            const removedIndex = filteredWrongAnswers.findIndex(wa => wa.id !== wrongId);
             filteredWrongAnswers = filteredWrongAnswers.filter(wa => wa.id !== wrongId);
             allWrongAnswers = allWrongAnswers.filter(wa => wa.id !== wrongId);
             
             updateStats();
+            
+            // 如果删除的是当前显示的卡片，调整索引
+            if (removedIndex <= currentWrongAnswerIndex && currentWrongAnswerIndex > 0) {
+                currentWrongAnswerIndex--;
+            }
+            if (currentWrongAnswerIndex >= filteredWrongAnswers.length && filteredWrongAnswers.length > 0) {
+                currentWrongAnswerIndex = filteredWrongAnswers.length - 1;
+            }
+            
             renderWrongAnswers();
         } else {
             alert('删除失败');
