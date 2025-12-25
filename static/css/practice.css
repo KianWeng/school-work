@@ -77,6 +77,11 @@
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
+/* 进度条和统计信息区域 */
+.progress-section {
+    margin-bottom: 30px;
+}
+
 /* 进度条 */
 .progress-bar {
     position: relative;
@@ -84,7 +89,7 @@
     height: 40px;
     background: #f0f0f0;
     border-radius: 20px;
-    margin-bottom: 30px;
+    margin-bottom: 15px;
     overflow: hidden;
 }
 
@@ -106,6 +111,49 @@
     font-weight: bold;
     color: #333;
     z-index: 1;
+}
+
+/* 练习统计信息 */
+.practice-stats {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.practice-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.stat-icon {
+    font-size: 1.3em;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: #666;
+    font-weight: 500;
+}
+
+.stat-number {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-number.correct {
+    color: #4caf50;
+}
+
+.stat-number.wrong {
+    color: #f44336;
 }
 
 /* 题目区域 */
@@ -230,7 +278,9 @@
     display: flex;
     gap: 15px;
     justify-content: center;
+    align-items: center;
     margin-top: 30px;
+    flex-wrap: wrap;
 }
 
 .action-btn {
@@ -265,6 +315,28 @@
 
 .skip-btn:hover {
     background: #e0e0e0;
+}
+
+/* 已移除上一题和下一题按钮样式 */
+
+/* 返回练习按钮 */
+.back-to-practice {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.back-practice-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 30px;
+    font-size: 1em;
+}
+
+.back-practice-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
 /* 反馈区域 */
