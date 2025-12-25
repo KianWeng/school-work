@@ -364,7 +364,7 @@ def get_words(textbook_id):
     
     # 根据教材ID加载单词数据
     if textbook_id == 'ket':
-        json_file = 'english/ket_A.json'
+        json_file = 'english/vocabulary/ket.json'
     else:
         return jsonify({'error': '不支持的教材'}), 404
     
@@ -423,7 +423,7 @@ def get_words_by_letter(textbook_id, letter):
     username = session.get('user_id')
     
     if textbook_id == 'ket':
-        json_file = 'english/ket_A.json'
+        json_file = 'english/vocabulary/ket.json'
     else:
         return jsonify({'error': '不支持的教材'}), 404
     
