@@ -55,7 +55,12 @@ class User(db.Model):
     
     def check_password(self, password):
         """检查密码是否正确"""
-        password_hash = hashlib.md5(password.encode()).hexdigest()
+        if not password:
+            return False
+        # 确保密码是字符串类型，并移除前后空格
+        password = str(password).strip()
+        # 使用 UTF-8 编码确保一致性
+        password_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
         return self.password_hash == password_hash
     
     @staticmethod
@@ -140,19 +145,29 @@ def login():
     
     # 从数据库验证用户
     user = User.query.filter_by(username=username).first()
-    if user and user.check_password(password):
-        session['user_id'] = user.username
-        session['user_name'] = user.name
-        if remember:
-            session.permanent = True
-        return jsonify({
-            'success': True,
-            'message': '登录成功',
-            'user': {
-                'id': user.username,
-                'name': user.name
-            }
-        })
+    if user:
+        # 调试信息：打印密码相关信息（仅用于调试，生产环境应移除）
+        import hashlib
+        input_hash = hashlib.md5(password.encode()).hexdigest()
+        print(f"[DEBUG] 登录尝试 - 用户名: {username}")
+        print(f"[DEBUG] 输入密码长度: {len(password)}")
+        print(f"[DEBUG] 输入密码哈希: {input_hash}")
+        print(f"[DEBUG] 存储密码哈希: {user.password_hash}")
+        print(f"[DEBUG] 哈希匹配: {input_hash == user.password_hash}")
+        
+        if user.check_password(password):
+            session['user_id'] = user.username
+            session['user_name'] = user.name
+            if remember:
+                session.permanent = True
+            return jsonify({
+                'success': True,
+                'message': '登录成功',
+                'user': {
+                    'id': user.username,
+                    'name': user.name
+                }
+            })
     
     return jsonify({'error': '用户名或密码错误'}), 401
 
@@ -196,6 +211,11 @@ def register():
     # 注册新用户
     try:
         password_hash = User.hash_password(password)
+        # 调试信息：打印注册相关信息（仅用于调试，生产环境应移除）
+        print(f"[DEBUG] 注册新用户 - 用户名: {username}")
+        print(f"[DEBUG] 注册密码长度: {len(password)}")
+        print(f"[DEBUG] 注册密码哈希: {password_hash}")
+        
         new_user = User(
             username=username,
             password_hash=password_hash,
@@ -203,6 +223,11 @@ def register():
         )
         db.session.add(new_user)
         db.session.commit()
+        
+        # 验证用户是否成功创建
+        verify_user = User.query.filter_by(username=username).first()
+        if verify_user:
+            print(f"[DEBUG] 用户创建成功，存储的密码哈希: {verify_user.password_hash}")
         
         # 自动登录
         session['user_id'] = username
