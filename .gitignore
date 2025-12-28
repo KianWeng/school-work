@@ -5,6 +5,13 @@ out/
 # 配置文件（包含敏感信息）
 config.py
 
+# SSL 证书文件（包含敏感信息）
+ssl/*.crt
+ssl/*.key
+ssl/*.pem
+ssl/*.csr
+ssl/*.cert
+
 # 日志文件
 *.log
 

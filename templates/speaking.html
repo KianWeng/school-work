@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>口语练习 - 小学生学习平台</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/speaking.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>🗣️ 口语练习</h1>
+            <div class="header-actions">
+                <button class="back-btn" onclick="window.location.href='/'">← 返回首页</button>
+            </div>
+        </header>
+
+        <!-- 等级选择区域 -->
+        <div class="level-selector" id="levelSelector">
+            <h2>选择练习等级</h2>
+            <div class="levels-grid" id="levelsGrid">
+                <!-- 等级卡片将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 口语练习主区域 -->
+        <div class="speaking-content" id="speakingContent" style="display: none;">
+            <!-- 当前等级显示 -->
+            <div class="current-level">
+                <span class="level-badge" id="currentLevelBadge">初级</span>
+                <button class="change-level-btn" id="changeLevelBtn" onclick="showLevelSelector()">更换等级</button>
+            </div>
+
+            <!-- 语音选择 -->
+            <div class="voice-selector">
+                <label for="voiceSelect">选择AI语音：</label>
+                <select id="voiceSelect" class="voice-select">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+
+            <!-- 对话显示区域 -->
+            <div class="conversation-container">
+                <div class="conversation-messages" id="conversationMessages">
+                    <!-- 对话消息将通过JavaScript动态添加 -->
+                </div>
+            </div>
+
+            <!-- 文本输入区域 -->
+            <div class="text-input-container">
+                <textarea id="userTextInput" class="user-text-input" placeholder="在此输入你的回答（英文），或留空后点击按钮录音..." rows="3"></textarea>
+                <button class="unified-action-btn" id="unifiedActionBtn" onclick="handleUnifiedAction()">
+                    <span class="action-icon" id="actionIcon">🎤</span>
+                    <span class="action-text" id="actionText">开始录音</span>
+                </button>
+            </div>
+
+            <!-- 控制面板 -->
+            <div class="control-panel">
+                <!-- 录音状态显示 -->
+                <div class="recording-status" id="recordingStatus" style="display: none;">
+                    <span class="recording-indicator"></span>
+                    <span>正在录音...</span>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="action-buttons">
+                    <button class="action-btn" id="newTopicBtn" onclick="startNewConversation()">
+                        🆕 新话题
+                    </button>
+                    <button class="action-btn" id="clearBtn" onclick="clearConversation()">
+                        🗑️ 清空对话
+                    </button>
+                </div>
+            </div>
+
+            <!-- 提示信息 -->
+            <div class="tips" id="tipsArea">
+                <p>💡 提示：点击"开始录音"按钮，说出你的回答，然后点击"停止录音"完成识别</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/speaking.js') }}"></script>
+</body>
+</html>
+

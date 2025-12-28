@@ -245,6 +245,9 @@ function createModuleCard(module, subjectId) {
         } else if (module.id === 'practice' && subjectId === 'english') {
             // 单词练习模块
             window.location.href = '/english/practice';
+        } else if (module.id === 'speaking' && subjectId === 'english') {
+            // 口语练习模块
+            window.location.href = '/english/speaking';
         } else {
             console.log('点击模块:', module);
             alert(`即将打开: ${module.name}\n功能开发中...`);

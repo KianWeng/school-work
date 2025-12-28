@@ -15,6 +15,7 @@ import json
 import requests
 from datetime import datetime, timedelta
 from io import BytesIO
+from whisper_client import recognize_speech_whisper
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -36,6 +37,9 @@ except ImportError:
     app.config['TTS_API_URL'] = os.getenv('TTS_API_URL', 'http://localhost:5050/v1/audio/speech')
     app.config['TTS_API_KEY'] = os.getenv('TTS_API_KEY', 'your_api_key_here')
     app.config['TTS_VOICE'] = os.getenv('TTS_VOICE', 'en-US-JennyNeural')
+    app.config['ASR_API_URL'] = os.getenv('ASR_API_URL', 'http://localhost:10095/v1/asr')
+    app.config['ASR_API_KEY'] = os.getenv('ASR_API_KEY', 'your_asr_api_key_here')
+    app.config['ASR_LANGUAGE'] = os.getenv('ASR_LANGUAGE', 'en')
 
 # 初始化数据库
 db = SQLAlchemy(app)
@@ -634,6 +638,9 @@ def generate_speech():
     print(f'TTS请求: 原始文本={data.get("text", "")[:50]}, 清理后={text[:50]}, voice={voice}, url={app.config["TTS_API_URL"]}')
     
     try:
+        import time
+        tts_start_time = time.time()
+        
         # 调用本地TTS API
         response = requests.post(
             app.config['TTS_API_URL'],
@@ -650,6 +657,8 @@ def generate_speech():
             timeout=10
         )
         
+        tts_time = time.time() - tts_start_time
+        print(f'[性能] TTS API调用耗时: {tts_time:.2f}秒')
         print(f'TTS响应状态码: {response.status_code}')
         
         if response.status_code == 200:
@@ -850,6 +859,355 @@ def delete_wrong_answer(wrong_id):
         app.logger.error(f'删除错题失败: {str(e)}')
         return jsonify({'error': f'删除错题失败: {str(e)}'}), 500
 
+# ==================== 口语练习相关路由 ====================
+
+# 不同等级的prompt模板
+SPEAKING_PROMPTS = {
+    'beginner': {
+        'name': '初级',
+        'description': '适合初学者，使用简单词汇和短句',
+        'system_prompt': '''You are a friendly English teacher helping a beginner student practice speaking English. 
+IMPORTANT: You MUST respond ONLY in English, regardless of what language the student uses. This is an English speaking practice session.
+Use simple words and short sentences (3-5 words). 
+Keep the conversation topics simple: greetings, daily activities, family, food, colors, numbers.
+Speak slowly and clearly. Use basic vocabulary only.
+Respond in a warm and encouraging way. Keep each response to 1-2 short sentences.
+If the student mentions a topic in Chinese or any other language, understand the topic and discuss it in English.
+
+CRITICAL REQUIREMENT - YOU MUST ALWAYS INCLUDE CHINESE TRANSLATION:
+After EVERY English response, you MUST add a Chinese translation in this EXACT format (no exceptions):
+[TRANSLATION]中文翻译内容[/TRANSLATION]
+
+The translation must be accurate and natural Chinese. This is mandatory for every response.
+
+Example format:
+Hello! How are you today?
+[TRANSLATION]你好！你今天怎么样？[/TRANSLATION]
+
+Remember: EVERY response must include the [TRANSLATION] tag with Chinese translation.''',
+        'user_prompt_template': 'Generate a simple conversation topic and start with a question in English. The topic is: {topic}. If the topic is in Chinese, translate it to English first, then start the conversation about that topic in English.'
+    },
+    'elementary': {
+        'name': '初级进阶',
+        'description': '使用基础词汇和简单句型',
+        'system_prompt': '''You are a patient English teacher helping an elementary student practice speaking English.
+IMPORTANT: You MUST respond ONLY in English, regardless of what language the student uses. This is an English speaking practice session.
+Use basic vocabulary and simple sentence structures (5-8 words).
+Topics can include: hobbies, school, weather, shopping, transportation, time.
+Use present tense mostly, with some simple past tense.
+Be encouraging and provide gentle corrections if needed. Keep responses to 2-3 sentences.
+If the student mentions a topic in Chinese or any other language, understand the topic and discuss it in English.
+
+CRITICAL REQUIREMENT - YOU MUST ALWAYS INCLUDE CHINESE TRANSLATION:
+After EVERY English response, you MUST add a Chinese translation in this EXACT format (no exceptions):
+[TRANSLATION]中文翻译内容[/TRANSLATION]
+
+The translation must be accurate and natural Chinese. This is mandatory for every response.
+
+Example format:
+I like playing basketball. What about you?
+[TRANSLATION]我喜欢打篮球。你呢？[/TRANSLATION]
+
+Remember: EVERY response must include the [TRANSLATION] tag with Chinese translation.''',
+        'user_prompt_template': 'Generate a conversation starter in English for an elementary student. The topic is: {topic}. If the topic is in Chinese, translate it to English first, then start the conversation about that topic in English.'
+    },
+    'intermediate': {
+        'name': '中级',
+        'description': '使用中等难度词汇和复合句',
+        'system_prompt': '''You are an experienced English teacher helping an intermediate student practice speaking English.
+IMPORTANT: You MUST respond ONLY in English, regardless of what language the student uses. This is an English speaking practice session.
+Use intermediate vocabulary and varied sentence structures (8-12 words).
+Topics can include: travel, work, health, entertainment, technology, environment.
+Use various tenses (present, past, future) and some conditional sentences.
+Engage in more natural conversation. Responses can be 3-4 sentences.
+If the student mentions a topic in Chinese or any other language, understand the topic and discuss it in English.
+
+CRITICAL REQUIREMENT - YOU MUST ALWAYS INCLUDE CHINESE TRANSLATION:
+After EVERY English response, you MUST add a Chinese translation in this EXACT format (no exceptions):
+[TRANSLATION]中文翻译内容[/TRANSLATION]
+
+The translation must be accurate and natural Chinese. This is mandatory for every response.
+
+Example format:
+I've been to Japan twice. The food there is amazing!
+[TRANSLATION]我去过日本两次。那里的食物很棒！[/TRANSLATION]
+
+Remember: EVERY response must include the [TRANSLATION] tag with Chinese translation.''',
+        'user_prompt_template': 'Generate an engaging conversation topic in English for an intermediate student. The topic is: {topic}. If the topic is in Chinese, translate it to English first, then start the conversation about that topic in English.'
+    },
+    'advanced': {
+        'name': '高级',
+        'description': '使用高级词汇和复杂句型',
+        'system_prompt': '''You are a professional English teacher helping an advanced student practice speaking English.
+IMPORTANT: You MUST respond ONLY in English, regardless of what language the student uses. This is an English speaking practice session.
+Use advanced vocabulary, idioms, and complex sentence structures (12+ words).
+Topics can include: current events, philosophy, science, business, culture, abstract concepts.
+Use all tenses, passive voice, subjunctive mood, and various sentence patterns.
+Engage in sophisticated discussions. Responses can be 4-5 sentences.
+If the student mentions a topic in Chinese or any other language, understand the topic and discuss it in English.
+
+CRITICAL REQUIREMENT - YOU MUST ALWAYS INCLUDE CHINESE TRANSLATION:
+After EVERY English response, you MUST add a Chinese translation in this EXACT format (no exceptions):
+[TRANSLATION]中文翻译内容[/TRANSLATION]
+
+The translation must be accurate and natural Chinese. This is mandatory for every response.
+
+Example format:
+The rapid advancement of artificial intelligence has profound implications for our society, raising both opportunities and ethical concerns.
+[TRANSLATION]人工智能的快速发展对我们的社会产生了深远的影响，既带来了机遇，也引发了伦理担忧。[/TRANSLATION]
+
+Remember: EVERY response must include the [TRANSLATION] tag with Chinese translation.''',
+        'user_prompt_template': 'Generate a thought-provoking conversation topic in English for an advanced student. The topic is: {topic}. If the topic is in Chinese, translate it to English first, then start the conversation about that topic in English.'
+    }
+}
+
+@app.route('/english/speaking')
+@login_required
+def speaking_page():
+    """口语练习页面"""
+    return render_template('speaking.html')
+
+@app.route('/api/english/speaking/levels')
+@login_required
+def get_speaking_levels():
+    """获取口语练习等级列表"""
+    levels = []
+    for level_id, level_info in SPEAKING_PROMPTS.items():
+        levels.append({
+            'id': level_id,
+            'name': level_info['name'],
+            'description': level_info['description']
+        })
+    return jsonify(levels)
+
+@app.route('/api/english/speaking/generate', methods=['POST'])
+@login_required
+def generate_conversation():
+    """生成对话内容"""
+    data = request.get_json()
+    level = data.get('level', 'beginner')
+    topic = data.get('topic', '')
+    conversation_history = data.get('history', [])  # 对话历史
+    
+    if level not in SPEAKING_PROMPTS:
+        return jsonify({'error': '无效的等级'}), 400
+    
+    level_config = SPEAKING_PROMPTS[level]
+    
+    # 构建消息列表
+    messages = [
+        {'role': 'system', 'content': level_config['system_prompt']}
+    ]
+    
+    # 添加对话历史
+    # 注意：对话历史中的assistant回复应该只包含英文（不包含翻译标记）
+    # 因为前端存储的是清理后的英文内容
+    for item in conversation_history[-5:]:  # 只保留最近5轮对话
+        if item.get('role') == 'user':
+            messages.append({'role': 'user', 'content': item.get('content', '')})
+        elif item.get('role') == 'assistant':
+            # 确保assistant回复只包含英文（清理可能的翻译标记）
+            assistant_content = item.get('content', '')
+            import re
+            translation_pattern = r'\[TRANSLATION\](.*?)\[/TRANSLATION\]'
+            # 如果历史中有翻译标记，移除它
+            assistant_content = re.sub(translation_pattern, '', assistant_content, flags=re.DOTALL).strip()
+            messages.append({'role': 'assistant', 'content': assistant_content})
+    
+    # 如果是新对话，生成初始话题
+    if not conversation_history:
+        # 处理话题：如果是中文，需要明确说明这是英文口语练习
+        topic_text = topic.strip() if topic else 'daily life'
+        # 检查是否包含中文字符
+        has_chinese = any('\u4e00' <= char <= '\u9fff' for char in topic_text)
+        
+        if has_chinese:
+            # 如果话题是中文，在prompt中明确说明要用英文讨论这个中文话题
+            user_prompt = f'''The student wants to practice English speaking about the topic: "{topic_text}" (this is in Chinese). 
+Please translate this topic to English and start a conversation in English about this topic. 
+Remember: This is an English speaking practice, so you must respond ONLY in English.
+
+REMINDER: You MUST include Chinese translation in [TRANSLATION]...[/TRANSLATION] format after your English response.'''
+        else:
+            # 英文话题，也要提醒翻译要求
+            user_prompt = f'''{level_config['user_prompt_template'].format(topic=topic_text)}
+
+REMINDER: You MUST include Chinese translation in [TRANSLATION]...[/TRANSLATION] format after your English response.'''
+    else:
+        # 继续对话
+        user_input = data.get('user_input', 'Continue the conversation naturally.')
+        # 检查用户输入是否包含中文
+        has_chinese = any('\u4e00' <= char <= '\u9fff' for char in user_input)
+        
+        if has_chinese:
+            # 如果用户输入包含中文，提示AI用英文回复
+            user_prompt = f'''The student said: "{user_input}" (this may contain Chinese). 
+Please understand what they mean and respond in English. This is an English speaking practice session, so you must respond ONLY in English.
+
+REMINDER: You MUST include Chinese translation in [TRANSLATION]...[/TRANSLATION] format after your English response.'''
+        else:
+            # 即使没有中文，也要提醒翻译要求
+            user_prompt = f'''{user_input}
+
+REMINDER: You MUST include Chinese translation in [TRANSLATION]...[/TRANSLATION] format after your English response.'''
+    
+    messages.append({'role': 'user', 'content': user_prompt})
+    
+    try:
+        import time
+        start_time = time.time()
+        
+        # 调用DeepSeek API
+        response = requests.post(
+            app.config['AI_API_URL'],
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f"Bearer {app.config['AI_API_KEY']}"
+            },
+            json={
+                'model': app.config['AI_MODEL'],
+                'messages': messages,
+                'temperature': 0.7,
+                'max_tokens': 400,  # 增加token数量以支持中文翻译（英文+中文）
+                'stream': False  # 不使用流式输出
+            },
+            timeout=app.config.get('AI_TIMEOUT', 30)
+        )
+        
+        ai_api_time = time.time() - start_time
+        print(f'[性能] AI API调用耗时: {ai_api_time:.2f}秒')
+        
+        if response.status_code == 200:
+            result = response.json()
+            assistant_message = result.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+            
+            # 解析英文和中文翻译
+            import re
+            translation_pattern = r'\[TRANSLATION\](.*?)\[/TRANSLATION\]'
+            translation_match = re.search(translation_pattern, assistant_message, re.DOTALL)
+            
+            english_text = assistant_message
+            chinese_translation = ''
+            
+            if translation_match:
+                # 提取中文翻译
+                chinese_translation = translation_match.group(1).strip()
+                # 移除翻译标记，只保留英文
+                english_text = re.sub(translation_pattern, '', assistant_message, flags=re.DOTALL).strip()
+                print(f'[成功] 解析到翻译: {chinese_translation[:50]}...')
+            else:
+                # 如果没有找到翻译标记，记录警告
+                print(f'[警告] AI回复中未找到翻译标记')
+                print(f'[调试] AI回复内容（前200字符）: {assistant_message[:200]}')
+                # 如果回复包含中文字符，可能是翻译但没有标记
+                if any('\u4e00' <= char <= '\u9fff' for char in assistant_message):
+                    print('[提示] 检测到中文字符，但未找到翻译标记格式，可能需要调整prompt')
+            
+            return jsonify({
+                'success': True,
+                'message': english_text,
+                'translation': chinese_translation,
+                'level': level
+            })
+        else:
+            error_msg = f'AI服务错误: {response.status_code}'
+            try:
+                error_detail = response.json()
+            except:
+                error_detail = response.text[:200] if response.text else '无详细信息'
+            
+            print(f'AI API错误: {error_msg}, 详情: {error_detail}')
+            return jsonify({
+                'error': error_msg,
+                'details': error_detail
+            }), response.status_code
+            
+    except requests.exceptions.ConnectionError as e:
+        error_msg = f'无法连接到AI服务 ({app.config["AI_API_URL"]})'
+        print(f'AI连接错误: {str(e)}')
+        return jsonify({'error': error_msg, 'type': 'connection_error'}), 500
+    except requests.exceptions.Timeout as e:
+        error_msg = 'AI服务响应超时，请稍后重试'
+        print(f'AI超时错误: {str(e)}')
+        return jsonify({'error': error_msg, 'type': 'timeout_error'}), 500
+    except Exception as e:
+        error_msg = f'生成对话失败: {str(e)}'
+        print(f'AI未知错误: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': error_msg, 'type': 'unknown_error'}), 500
+
+@app.route('/api/english/speaking/recognize', methods=['POST'])
+@login_required
+def recognize_speech():
+    """使用Whisper本地进行语音识别"""
+    if 'audio' not in request.files:
+        return jsonify({'error': '未找到音频文件'}), 400
+    
+    audio_file = request.files['audio']
+    language = request.form.get('language', app.config.get('WHISPER_LANGUAGE', 'en'))
+    
+    if audio_file.filename == '':
+        return jsonify({'error': '音频文件为空'}), 400
+    
+    # 获取Whisper配置
+    whisper_model = app.config.get('WHISPER_MODEL', 'base')
+    # 将语言代码转换为Whisper支持的语言代码，如果不在支持列表中则设为None（自动检测）
+    # Whisper支持的语言代码：https://github.com/openai/whisper/blob/main/whisper/tokenizer.py
+    supported_languages = ['en', 'zh', 'ja', 'ko', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'ar', 'hi', 'th', 'vi', 'tr', 'pl', 'nl', 'cs', 'sv', 'ro', 'hu', 'fi', 'da', 'no', 'el', 'he', 'uk', 'id', 'ms', 'sk', 'hr', 'bg', 'sr', 'sl', 'et', 'lv', 'lt', 'mt', 'ga', 'cy', 'is', 'mk', 'sq', 'be', 'bs', 'ca', 'eu', 'gl', 'lb']
+    whisper_language = language if language in supported_languages else None
+    whisper_task = app.config.get('WHISPER_TASK', 'transcribe')
+    
+    try:
+        # 准备音频数据
+        audio_data = audio_file.read()
+        filename = audio_file.filename or 'recording.wav'
+        
+        print(f'Whisper识别请求: 模型={whisper_model}, 语言={whisper_language}, 任务={whisper_task}, 文件={filename}, 大小={len(audio_data)} bytes')
+        
+        # 调用Whisper识别函数
+        recognized_text = recognize_speech_whisper(
+            audio_data=audio_data,
+            filename=filename,
+            model_name=whisper_model,
+            language=whisper_language,
+            task=whisper_task
+        )
+        
+        if not recognized_text:
+            return jsonify({
+                'error': '未能识别到语音内容',
+                'type': 'empty_result'
+            }), 400
+        
+        print(f'识别结果: {recognized_text}')
+        
+        return jsonify({
+            'success': True,
+            'text': recognized_text
+        })
+            
+    except Exception as e:
+        error_msg = f'语音识别失败: {str(e)}'
+        print(f'Whisper错误: {error_msg}')
+        import traceback
+        traceback.print_exc()
+        
+        # 判断错误类型
+        if 'model' in str(e).lower() or '加载' in str(e):
+            error_type = 'model_error'
+            error_msg = f'Whisper模型加载失败: {str(e)}'
+        elif 'memory' in str(e).lower() or '内存' in str(e):
+            error_type = 'memory_error'
+            error_msg = '内存不足，请尝试使用更小的模型（如 tiny 或 base）'
+        else:
+            error_type = 'unknown_error'
+        
+        return jsonify({
+            'error': error_msg,
+            'type': error_type
+        }), 500
+
 # 初始化数据库表
 def init_db():
     """初始化数据库"""
@@ -876,8 +1234,28 @@ if __name__ == '__main__':
     host = app.config.get('HOST', '0.0.0.0')
     port = app.config.get('PORT', 50000)
     debug = app.config.get('DEBUG', True)
+    ssl_enabled = app.config.get('SSL_ENABLED', False)
+    ssl_cert = app.config.get('SSL_CERT_PATH', 'ssl/server.crt')
+    ssl_key = app.config.get('SSL_KEY_PATH', 'ssl/server.key')
     
-    print(f'🚀 启动服务器: http://{host}:{port}')
+    # 检查 SSL 证书文件是否存在
+    if ssl_enabled:
+        import os
+        if not os.path.exists(ssl_cert) or not os.path.exists(ssl_key):
+            print('⚠️  警告: SSL 已启用但证书文件不存在')
+            print(f'   证书路径: {ssl_cert}')
+            print(f'   私钥路径: {ssl_key}')
+            print('   请参考 HTTPS_SETUP.md 生成证书，或设置 SSL_ENABLED=False')
+            ssl_enabled = False
+    
+    protocol = 'https' if ssl_enabled else 'http'
+    print(f'🚀 启动服务器: {protocol}://{host}:{port}')
     print(f'📝 调试模式: {debug}')
-    app.run(debug=debug, host=host, port=port)
+    if ssl_enabled:
+        print(f'🔒 SSL 已启用')
+        print(f'   证书: {ssl_cert}')
+        print(f'   私钥: {ssl_key}')
+        app.run(debug=debug, host=host, port=port, ssl_context=(ssl_cert, ssl_key))
+    else:
+        app.run(debug=debug, host=host, port=port)
 
