@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-小学生学习平台 - 后端应用
+小鱼快学 - 小学生智能学习平台
 """
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
