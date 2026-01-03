@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>口算练习 - 小鱼快学</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/calculation.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>🔢 口算练习</h1>
+            <div class="header-actions">
+                <button class="back-btn" onclick="window.location.href='/'">← 返回首页</button>
+            </div>
+        </header>
+
+        <!-- 练习设置 -->
+        <div class="practice-settings">
+            <div class="setting-group">
+                <label>运算类型：</label>
+                <select id="operationType" class="setting-select">
+                    <option value="mixed">混合运算</option>
+                    <option value="addition">加法</option>
+                    <option value="subtraction">减法</option>
+                    <option value="multiplication">乘法</option>
+                    <option value="division">除法</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>难度等级：</label>
+                <select id="difficulty" class="setting-select">
+                    <option value="easy">简单（1-20）</option>
+                    <option value="medium" selected>中等（10-99）</option>
+                    <option value="hard">困难（100-999）</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>题目数量：</label>
+                <select id="problemCount" class="setting-select">
+                    <option value="10">10题</option>
+                    <option value="20" selected>20题</option>
+                    <option value="30">30题</option>
+                    <option value="50">50题</option>
+                </select>
+            </div>
+            <button class="start-btn" id="startBtn" onclick="startPractice()">开始练习</button>
+        </div>
+
+        <!-- 练习区域 -->
+        <div class="practice-content" id="practiceContent" style="display: none;">
+            <!-- 进度条和统计信息 -->
+            <div class="progress-section">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <div class="progress-text" id="progressText">1 / 20</div>
+                </div>
+                <div class="practice-stats">
+                    <div class="practice-stat-item">
+                        <span class="stat-icon">✓</span>
+                        <span class="stat-label">正确</span>
+                        <span class="stat-number correct" id="practiceCorrectCount">0</span>
+                    </div>
+                    <div class="practice-stat-item">
+                        <span class="stat-icon">✗</span>
+                        <span class="stat-label">错误</span>
+                        <span class="stat-number wrong" id="practiceWrongCount">0</span>
+                    </div>
+                    <div class="practice-stat-item">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-label">用时</span>
+                        <span class="stat-number" id="practiceTime">0秒</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 题目区域 -->
+            <div class="question-area" id="questionArea">
+                <div class="question-display">
+                    <div class="question-text" id="questionText">题目加载中...</div>
+                </div>
+            </div>
+
+            <!-- 答案区域 -->
+            <div class="answer-area" id="answerArea">
+                <input type="number" 
+                       id="answerInput" 
+                       class="answer-input" 
+                       placeholder="请输入答案" 
+                       autocomplete="off"
+                       autofocus>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+                <button class="action-btn submit-btn" id="submitBtn" onclick="submitAnswer()" disabled>提交答案 (Enter)</button>
+                <button class="action-btn skip-btn" id="skipBtn" onclick="skipQuestion()">跳过 (ESC)</button>
+            </div>
+
+            <!-- 反馈区域 -->
+            <div class="feedback-area" id="feedbackArea" style="display: none;">
+                <!-- 反馈信息 -->
+            </div>
+        </div>
+
+        <!-- 练习结果 -->
+        <div class="practice-result" id="practiceResult" style="display: none;">
+            <h2>🎉 练习完成！</h2>
+            <div class="result-stats">
+                <div class="stat-item">
+                    <span class="stat-label">总题数</span>
+                    <span class="stat-value" id="totalQuestions">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">正确</span>
+                    <span class="stat-value correct" id="correctCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">错误</span>
+                    <span class="stat-value wrong" id="wrongCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">正确率</span>
+                    <span class="stat-value" id="accuracy">0%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">用时</span>
+                    <span class="stat-value" id="totalTime">0秒</span>
+                </div>
+            </div>
+            <div class="result-actions">
+                <button class="action-btn" onclick="restartPractice()">再来一次</button>
+                <button class="action-btn" onclick="backToSettings()">返回设置</button>
+                <button class="action-btn" onclick="window.location.href='/'">返回首页</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/calculation.js') }}"></script>
+</body>
+</html>
+
