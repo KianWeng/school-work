@@ -4,6 +4,7 @@ let allWords = [];
 let filteredWords = []; // 当前过滤后的单词列表
 let currentWordIndex = 0; // 当前显示的单词索引
 let currentLetter = 'ALL';
+let currentStatus = 'ALL'; // 当前过滤的状态：ALL, new, learning, mastered, review
 let stats = {
     total: 0,
     new: 0,
@@ -183,6 +184,7 @@ async function selectTextbook(textbookId) {
     await loadStats(textbookId);
     await loadVoices(); // 确保语音列表已加载
     renderLetterNav();
+    setupStatsClickHandlers(); // 设置统计项的点击事件
 }
 
 // 加载单词
@@ -219,6 +221,69 @@ async function loadStats(textbookId) {
     }
 }
 
+// 设置统计项的点击事件
+function setupStatsClickHandlers() {
+    // 新词
+    const statNew = document.getElementById('statNew');
+    if (statNew) {
+        statNew.style.cursor = 'pointer';
+        statNew.title = '点击查看新词';
+        statNew.addEventListener('click', () => {
+            if (currentStatus === 'new') {
+                // 如果已经是新词状态，点击则取消过滤
+                filterByStatus('ALL');
+            } else {
+                filterByStatus('new');
+            }
+        });
+    }
+    
+    // 学习中
+    const statLearning = document.getElementById('statLearning');
+    if (statLearning) {
+        statLearning.style.cursor = 'pointer';
+        statLearning.title = '点击查看学习中的单词';
+        statLearning.addEventListener('click', () => {
+            if (currentStatus === 'learning') {
+                // 如果已经是学习中状态，点击则取消过滤
+                filterByStatus('ALL');
+            } else {
+                filterByStatus('learning');
+            }
+        });
+    }
+    
+    // 已掌握
+    const statMastered = document.getElementById('statMastered');
+    if (statMastered) {
+        statMastered.style.cursor = 'pointer';
+        statMastered.title = '点击查看已掌握的单词';
+        statMastered.addEventListener('click', () => {
+            if (currentStatus === 'mastered') {
+                // 如果已经是已掌握状态，点击则取消过滤
+                filterByStatus('ALL');
+            } else {
+                filterByStatus('mastered');
+            }
+        });
+    }
+    
+    // 需复习
+    const statReview = document.getElementById('statReview');
+    if (statReview) {
+        statReview.style.cursor = 'pointer';
+        statReview.title = '点击查看需复习的单词';
+        statReview.addEventListener('click', () => {
+            if (currentStatus === 'review') {
+                // 如果已经是需复习状态，点击则取消过滤
+                filterByStatus('ALL');
+            } else {
+                filterByStatus('review');
+            }
+        });
+    }
+}
+
 // 更新统计显示
 function updateStatsDisplay() {
     document.getElementById('statTotal').textContent = stats.total || 0;
@@ -226,6 +291,29 @@ function updateStatsDisplay() {
     document.getElementById('statLearning').textContent = stats.learning || 0;
     document.getElementById('statMastered').textContent = stats.mastered || 0;
     document.getElementById('statReview').textContent = stats.review || 0;
+    
+    // 更新统计项的点击状态样式
+    const statItems = document.querySelectorAll('.stat-item');
+    statItems.forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // 根据当前状态高亮对应的统计项
+    if (currentStatus !== 'ALL') {
+        const statusMap = {
+            'new': 'statNew',
+            'learning': 'statLearning',
+            'mastered': 'statMastered',
+            'review': 'statReview'
+        };
+        const statId = statusMap[currentStatus];
+        if (statId) {
+            const statEl = document.getElementById(statId);
+            if (statEl) {
+                statEl.closest('.stat-item').classList.add('active');
+            }
+        }
+    }
 }
 
 // 渲染字母导航
@@ -251,7 +339,7 @@ function renderLetterNav() {
         btn.addEventListener('click', () => {
             currentLetter = letter;
             renderLetterNav();
-            renderWords(); // 这会重置索引并显示第一个单词
+            renderWords(); // 这会重置索引并显示第一个单词，但保持状态过滤
         });
         letterNav.appendChild(btn);
     });
@@ -259,11 +347,19 @@ function renderLetterNav() {
 
 // 渲染单词列表
 function renderWords() {
-    // 按字母过滤
+    // 先按字母过滤
     if (currentLetter !== 'ALL') {
         filteredWords = allWords.filter(word => word.letter === currentLetter);
     } else {
         filteredWords = allWords;
+    }
+    
+    // 再按状态过滤
+    if (currentStatus !== 'ALL') {
+        filteredWords = filteredWords.filter(word => {
+            const status = word.progress?.status || 'new';
+            return status === currentStatus;
+        });
     }
     
     // 重置索引
@@ -410,6 +506,9 @@ function createWordCard(word) {
 // 更新单词状态
 async function updateWordStatus(word, status) {
     try {
+        // 保存当前单词，用于重新加载后恢复位置
+        const currentWord = word;
+        
         const response = await fetch('/api/english/word/progress', {
             method: 'POST',
             headers: {
@@ -427,7 +526,18 @@ async function updateWordStatus(word, status) {
             // 重新加载单词和统计
             await loadWords(currentTextbook);
             await loadStats(currentTextbook);
+            
+            // 重新渲染单词列表，但保持当前单词位置
             renderWords();
+            
+            // 找到刚才标记的单词在新列表中的位置
+            const wordIndex = filteredWords.findIndex(w => w.word === currentWord);
+            if (wordIndex !== -1) {
+                currentWordIndex = wordIndex;
+                showCurrentWord();
+                updateWordCounter();
+                updateNavButtons();
+            }
         } else {
             alert('更新失败，请重试');
         }
@@ -437,10 +547,20 @@ async function updateWordStatus(word, status) {
     }
 }
 
+// 按状态过滤单词
+function filterByStatus(status) {
+    currentStatus = status;
+    currentLetter = 'ALL'; // 重置字母过滤
+    renderLetterNav(); // 重新渲染字母导航
+    renderWords(); // 重新渲染单词列表
+    updateStatsDisplay(); // 更新统计显示（高亮当前状态）
+}
+
 // 返回教材选择
 function backToTextbooks() {
     currentTextbook = null;
     currentLetter = 'ALL';
+    currentStatus = 'ALL';
     allWords = [];
     
     // 显示教材选择区域

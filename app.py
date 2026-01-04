@@ -533,21 +533,29 @@ def update_word_progress():
             user_id=username,
             word=word,
             textbook=textbook,
-            status=status
+            status=status,
+            review_count=0  # 显式初始化
         )
         db.session.add(progress)
     else:
         progress.status = status
         progress.updated_at = datetime.utcnow()
+        # 确保 review_count 不为 None（处理旧数据）
+        if progress.review_count is None:
+            progress.review_count = 0
     
     # 更新复习相关字段
     if status == 'mastered':
+        if progress.review_count is None:
+            progress.review_count = 0
         progress.review_count += 1
         progress.last_review = datetime.utcnow()
         # 设置下次复习时间（根据复习次数递增间隔）
         days = min(progress.review_count * 2, 30)  # 最多30天
         progress.next_review = datetime.utcnow() + timedelta(days=days)
     elif status == 'review':
+        if progress.review_count is None:
+            progress.review_count = 0
         progress.review_count += 1
         progress.last_review = datetime.utcnow()
     
