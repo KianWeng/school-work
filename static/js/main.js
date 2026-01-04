@@ -254,6 +254,9 @@ function createModuleCard(module, subjectId) {
         } else if (module.id === 'books' && subjectId === 'chinese') {
             // 语文课文学习模块
             window.location.href = '/chinese/books';
+        } else if (module.id === 'reading' && subjectId === 'chinese') {
+            // 语文阅读理解模块
+            window.location.href = '/chinese/reading';
         } else {
             console.log('点击模块:', module);
             alert(`即将打开: ${module.name}\n功能开发中...`);

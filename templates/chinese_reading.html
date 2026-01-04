@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阅读理解 - 小鱼快学</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chinese_reading.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>📖 阅读理解</h1>
+            <div class="header-actions">
+                <button class="back-btn" onclick="window.location.href='/'">← 返回首页</button>
+            </div>
+        </header>
+
+        <!-- 年级选择 -->
+        <div class="grade-selector" id="gradeSelector">
+            <h2>选择年级</h2>
+            <div class="grades-grid" id="gradesGrid">
+                <!-- 年级卡片将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 阅读理解内容 -->
+        <div class="reading-content" id="readingContent" style="display: none;">
+            <div class="reading-header">
+                <button class="back-btn" id="backToGrades" onclick="backToGrades()">← 返回年级选择</button>
+                <div class="header-controls">
+                    <input type="text" id="topicInput" placeholder="输入主题（可选，如：春天、动物、友谊等）" class="topic-input">
+                    <button class="generate-btn" id="generateBtn" onclick="generateReading()">生成新题目</button>
+                </div>
+            </div>
+
+            <!-- 加载状态 -->
+            <div class="loading-container" id="loadingContainer" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>正在生成阅读理解题目，请稍候...</p>
+            </div>
+
+            <!-- 文章和题目 -->
+            <div class="reading-body" id="readingBody" style="display: none;">
+                <!-- 文章 -->
+                <div class="article-section">
+                    <h3>📄 阅读文章</h3>
+                    <div class="article-content" id="articleContent"></div>
+                </div>
+
+                <!-- 题目 -->
+                <div class="questions-section">
+                    <h3>❓ 回答问题</h3>
+                    <div class="questions-list" id="questionsList"></div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="submit-section">
+                    <button class="submit-btn" id="submitBtn" onclick="checkAnswers()">提交答案</button>
+                </div>
+            </div>
+
+            <!-- 答案结果 -->
+            <div class="result-section" id="resultSection" style="display: none;">
+                <h3>📊 答题结果</h3>
+                <div class="result-summary" id="resultSummary"></div>
+                <div class="result-details" id="resultDetails"></div>
+                <div class="result-actions">
+                    <button class="action-btn" onclick="generateReading()">生成新题目</button>
+                    <button class="action-btn" onclick="showAnswers()">查看答案</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/chinese_reading.js') }}"></script>
+</body>
+</html>
+
