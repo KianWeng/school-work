@@ -9,7 +9,7 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from models import db, User
-from blueprints import auth, main, english, math
+from blueprints import auth, main, english, math, chinese
 
 # 创建 Flask 应用
 app = Flask(__name__)
@@ -44,6 +44,7 @@ app.register_blueprint(auth.auth_bp)
 app.register_blueprint(main.main_bp)
 app.register_blueprint(english.english_bp)
 app.register_blueprint(math.math_bp)
+app.register_blueprint(chinese.chinese_bp)
 
 # 初始化数据库表
 def init_db():

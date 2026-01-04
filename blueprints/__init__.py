@@ -4,7 +4,7 @@
 蓝图模块
 """
 
-from . import auth, main, english, math
+from . import auth, main, english, math, chinese
 
-__all__ = ['auth', 'main', 'english', 'math']
+__all__ = ['auth', 'main', 'english', 'math', 'chinese']
 

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课文学习 - 小鱼快学</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chinese_books.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>📚 课文学习</h1>
+            <div class="header-actions">
+                <button class="back-btn" onclick="window.location.href='/'">← 返回首页</button>
+            </div>
+        </header>
+
+        <!-- 年级选择 -->
+        <div class="grade-selector" id="gradeSelector">
+            <h2>选择年级</h2>
+            <div class="grades-grid" id="gradesGrid">
+                <!-- 年级卡片将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 课文列表 -->
+        <div class="lessons-content" id="lessonsContent" style="display: none;">
+            <div class="lessons-header">
+                <button class="back-btn" id="backToGrades" onclick="backToGrades()">← 返回年级选择</button>
+                <h2 id="gradeTitle">课文列表</h2>
+            </div>
+            <div class="lessons-list" id="lessonsList">
+                <!-- 课文列表将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 视频播放器 -->
+        <div class="video-player-container" id="videoPlayerContainer" style="display: none;">
+            <div class="video-header">
+                <button class="back-btn" id="backToLessons" onclick="backToLessons()">← 返回课文列表</button>
+                <h2 id="lessonTitle">课文视频</h2>
+            </div>
+            <div class="video-wrapper">
+                <video id="lessonVideo" controls>
+                    您的浏览器不支持视频播放。
+                </video>
+            </div>
+            <div class="video-controls">
+                <button class="nav-btn" id="prevLessonBtn" onclick="playPrevLesson()" disabled>← 上一课</button>
+                <button class="nav-btn" id="nextLessonBtn" onclick="playNextLesson()" disabled>下一课 →</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/chinese_books.js') }}"></script>
+</body>
+</html>
+

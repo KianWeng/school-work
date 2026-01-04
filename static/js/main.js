@@ -251,6 +251,9 @@ function createModuleCard(module, subjectId) {
         } else if (module.id === 'calculation' && subjectId === 'math') {
             // 数学口算练习模块
             window.location.href = '/math/calculation';
+        } else if (module.id === 'books' && subjectId === 'chinese') {
+            // 语文课文学习模块
+            window.location.href = '/chinese/books';
         } else {
             console.log('点击模块:', module);
             alert(`即将打开: ${module.name}\n功能开发中...`);

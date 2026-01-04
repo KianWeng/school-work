@@ -70,6 +70,7 @@ def get_subject_modules(subject_id):
     """获取指定学科的模块列表"""
     modules = {
         'chinese': [
+            {'id': 'books', 'name': '课文学习', 'description': '学习语文课文动画', 'icon': '📖'},
             {'id': 'hanzi', 'name': '汉字学习', 'description': '学习常用汉字'},
             {'id': 'poetry', 'name': '古诗词', 'description': '背诵古诗词'},
             {'id': 'reading', 'name': '阅读理解', 'description': '阅读文章并回答问题'},
