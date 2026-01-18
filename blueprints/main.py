@@ -85,6 +85,7 @@ def get_subject_modules(subject_id):
         'english': [
             {'id': 'vocabulary', 'name': '单词学习', 'description': '学习英语单词', 'icon': '📖'},
             {'id': 'practice', 'name': '单词练习', 'description': '练习单词记忆', 'icon': '✏️'},
+            {'id': 'reading', 'name': '英语阅读', 'description': '学乐深度阅读指导课', 'icon': '📚'},
             {'id': 'grammar', 'name': '语法练习', 'description': '练习英语语法', 'icon': '📝'},
             {'id': 'listening', 'name': '听力训练', 'description': '提高听力水平', 'icon': '🎧'},
             {'id': 'speaking', 'name': '口语练习', 'description': '练习英语口语', 'icon': '🗣️'}

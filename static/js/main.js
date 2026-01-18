@@ -248,6 +248,9 @@ function createModuleCard(module, subjectId) {
         } else if (module.id === 'speaking' && subjectId === 'english') {
             // 口语练习模块
             window.location.href = '/english/speaking';
+        } else if (module.id === 'reading' && subjectId === 'english') {
+            // 英语阅读模块
+            window.location.href = '/english/reading';
         } else if (module.id === 'calculation' && subjectId === 'math') {
             // 数学口算练习模块
             window.location.href = '/math/calculation';

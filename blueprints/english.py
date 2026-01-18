@@ -6,14 +6,23 @@
 
 import re
 import json
+import os
+import html
 import requests
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, jsonify, request, session, current_app
+from flask import Blueprint, render_template, jsonify, request, session, current_app, send_from_directory
 from models import db, WordProgress, WrongAnswer
 from utils import login_required
 from whisper_client import recognize_speech_whisper
 
 english_bp = Blueprint('english', __name__)
+
+# 英语阅读目录路径
+READING_BASE_PATH = 'english/reading/学乐深度阅读Level1-9指导课'
+READING_BOOKS_PATH = 'english/reading/学习深度阅读学生用书1-9级'
+READING_WORKBOOK_PATH = 'english/reading/学习深度阅读练习册1-9级'
+READING_LOG_PATH = 'english/reading/学习深度阅读阅读日志1-9级'
+READING_ANSWER_PATH = 'english/reading/学习深度阅读答案1-9级'
 
 # ==================== 英语单词学习相关路由 ====================
 
@@ -878,4 +887,280 @@ def recognize_speech():
             'type': error_type
         }), 500
 
-# ==================== 数学口算练习相关路由 ====================
+# ==================== 英语阅读相关路由 ====================
+
+def scan_reading_levels():
+    """扫描阅读Level目录，返回所有可用的Level"""
+    levels = []
+    base_path = READING_BASE_PATH
+    
+    if not os.path.exists(base_path):
+        return levels
+    
+    for item in os.listdir(base_path):
+        item_path = os.path.join(base_path, item)
+        if os.path.isdir(item_path) and not item.startswith('@') and not item.startswith('.'):
+            # 解析Level信息
+            # 格式：学乐深度阅读Level 1 指导课
+            match = re.search(r'Level\s*(\d+)', item)
+            if match:
+                level_num = int(match.group(1))
+                
+                levels.append({
+                    'id': f'level{level_num}',
+                    'number': level_num,
+                    'name': f'Level {level_num}',
+                    'display_name': f'Level {level_num}',
+                    'directory': item
+                })
+    
+    # 按Level排序
+    levels.sort(key=lambda x: x['number'])
+    return levels
+
+
+def get_lessons_by_level(level_dir):
+    """获取指定Level目录下的所有课程"""
+    lessons = []
+    level_path = os.path.join(READING_BASE_PATH, level_dir)
+    
+    if not os.path.exists(level_path):
+        return lessons
+    
+    for filename in os.listdir(level_path):
+        if filename.endswith('.mp4') and not filename.startswith('.'):
+            # 解析文件名：深度阅读L1第01课 The Way To Go.mp4
+            match = re.match(r'深度阅读L\d+第(\d+)课\s*(.+)\.mp4', filename)
+            if match:
+                lesson_num = int(match.group(1))
+                lesson_title = match.group(2).strip()
+                # 处理HTML实体编码（如 &#39; 转换为 '）
+                lesson_title = html.unescape(lesson_title)
+                
+                lessons.append({
+                    'id': lesson_num,
+                    'number': lesson_num,
+                    'title': lesson_title,
+                    'filename': filename,
+                    'video_path': os.path.join(level_dir, filename).replace('\\', '/')
+                })
+    
+    # 按序号排序
+    lessons.sort(key=lambda x: x['number'])
+    return lessons
+
+
+@english_bp.route('/english/reading')
+@login_required
+def reading_page():
+    """英语阅读页面"""
+    return render_template('english_reading.html')
+
+
+@english_bp.route('/api/english/reading/levels')
+@login_required
+def get_reading_levels():
+    """获取所有Level列表"""
+    levels = scan_reading_levels()
+    return jsonify({
+        'total': len(levels),
+        'levels': levels
+    })
+
+
+def get_pdf_files_for_level(level_num):
+    """获取指定Level的PDF文件（书籍、练习册、阅读日志、答案）"""
+    pdfs = {
+        'book': None,      # 学生用书
+        'workbook': None,  # 练习册
+        'log': None,       # 阅读日志
+        'answer': None     # 答案
+    }
+    
+    # 学生用书
+    book_filename = f'学习深度阅读学生用书{level_num}级.pdf'
+    book_path = os.path.join(READING_BOOKS_PATH, book_filename)
+    if os.path.exists(book_path):
+        pdfs['book'] = {
+            'name': f'学生用书{level_num}级',
+            'filename': book_filename,
+            'path': book_filename  # 只传递文件名，基础路径在路由中处理
+        }
+    
+    # 练习册
+    workbook_filename = f'学习深度阅读练习册{level_num}级.pdf'
+    workbook_path = os.path.join(READING_WORKBOOK_PATH, workbook_filename)
+    if os.path.exists(workbook_path):
+        pdfs['workbook'] = {
+            'name': f'练习册{level_num}级',
+            'filename': workbook_filename,
+            'path': workbook_filename
+        }
+    
+    # 阅读日志
+    log_filename = f'学习深度阅读阅读日志{level_num}级.pdf'
+    log_path = os.path.join(READING_LOG_PATH, log_filename)
+    if os.path.exists(log_path):
+        pdfs['log'] = {
+            'name': f'阅读日志{level_num}级',
+            'filename': log_filename,
+            'path': log_filename
+        }
+    
+    # 答案
+    answer_filename = f'学习深度阅读答案{level_num}级.pdf'
+    answer_path = os.path.join(READING_ANSWER_PATH, answer_filename)
+    if os.path.exists(answer_path):
+        pdfs['answer'] = {
+            'name': f'答案{level_num}级',
+            'filename': answer_filename,
+            'path': answer_filename
+        }
+    
+    return pdfs
+
+
+@english_bp.route('/api/english/reading/level/<level_id>/lessons')
+@login_required
+def get_reading_lessons(level_id):
+    """获取指定Level的所有课程"""
+    # 根据 level_id 找到对应的目录
+    levels = scan_reading_levels()
+    level_info = None
+    
+    for level in levels:
+        if level['id'] == level_id:
+            level_info = level
+            break
+    
+    if not level_info:
+        return jsonify({'error': 'Level不存在'}), 404
+    
+    lessons = get_lessons_by_level(level_info['directory'])
+    
+    # 获取该Level的PDF文件
+    pdfs = get_pdf_files_for_level(level_info['number'])
+    
+    return jsonify({
+        'level': level_info,
+        'total': len(lessons),
+        'lessons': lessons,
+        'pdfs': pdfs
+    })
+
+
+@english_bp.route('/api/english/reading/video/<path:video_path>')
+@login_required
+def get_reading_video(video_path):
+    """获取阅读视频文件"""
+    # 安全检查：确保路径在 READING_BASE_PATH 下
+    full_path = os.path.join(READING_BASE_PATH, video_path)
+    base_path = os.path.abspath(READING_BASE_PATH)
+    full_path_abs = os.path.abspath(full_path)
+    
+    # 防止路径遍历攻击
+    if not full_path_abs.startswith(base_path):
+        return jsonify({'error': '无效的路径'}), 403
+    
+    if not os.path.exists(full_path_abs):
+        return jsonify({'error': '视频文件不存在'}), 404
+    
+    # 获取目录和文件名
+    directory = os.path.dirname(full_path_abs)
+    filename = os.path.basename(full_path_abs)
+    
+    return send_from_directory(
+        directory,
+        filename,
+        mimetype='video/mp4',
+        as_attachment=False
+    )
+
+
+@english_bp.route('/api/english/reading/pdf/<pdf_type>/<path:pdf_path>')
+@login_required
+def get_reading_pdf(pdf_type, pdf_path):
+    """获取PDF文件（书籍、练习册、阅读日志、答案）"""
+    # 根据类型确定基础路径
+    base_paths = {
+        'book': READING_BOOKS_PATH,
+        'workbook': READING_WORKBOOK_PATH,
+        'log': READING_LOG_PATH,
+        'answer': READING_ANSWER_PATH
+    }
+    
+    if pdf_type not in base_paths:
+        return jsonify({'error': '无效的PDF类型'}), 400
+    
+    base_path = base_paths[pdf_type]
+    
+    # 安全检查：确保路径在对应的基础路径下
+    full_path = os.path.join(base_path, pdf_path)
+    base_path_abs = os.path.abspath(base_path)
+    full_path_abs = os.path.abspath(full_path)
+    
+    # 防止路径遍历攻击
+    if not full_path_abs.startswith(base_path_abs):
+        return jsonify({'error': '无效的路径'}), 403
+    
+    if not os.path.exists(full_path_abs):
+        return jsonify({'error': 'PDF文件不存在'}), 404
+    
+    # 获取目录和文件名
+    directory = os.path.dirname(full_path_abs)
+    filename = os.path.basename(full_path_abs)
+    
+    return send_from_directory(
+        directory,
+        filename,
+        mimetype='application/pdf',
+        as_attachment=True
+    )
+
+
+@english_bp.route('/api/english/reading/lesson/<level_id>/<int:lesson_id>')
+@login_required
+def get_reading_lesson_detail(level_id, lesson_id):
+    """获取课程详情"""
+    # 获取Level信息
+    levels = scan_reading_levels()
+    level_info = None
+    
+    for level in levels:
+        if level['id'] == level_id:
+            level_info = level
+            break
+    
+    if not level_info:
+        return jsonify({'error': 'Level不存在'}), 404
+    
+    # 获取课程列表
+    lessons = get_lessons_by_level(level_info['directory'])
+    lesson = None
+    
+    for l in lessons:
+        if l['id'] == lesson_id:
+            lesson = l
+            break
+    
+    if not lesson:
+        return jsonify({'error': '课程不存在'}), 404
+    
+    # 获取前后课程
+    prev_lesson = None
+    next_lesson = None
+    
+    for i, l in enumerate(lessons):
+        if l['id'] == lesson_id:
+            if i > 0:
+                prev_lesson = lessons[i - 1]
+            if i < len(lessons) - 1:
+                next_lesson = lessons[i + 1]
+            break
+    
+    return jsonify({
+        'level': level_info,
+        'lesson': lesson,
+        'prev_lesson': prev_lesson,
+        'next_lesson': next_lesson
+    })
