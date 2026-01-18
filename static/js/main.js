@@ -254,6 +254,9 @@ function createModuleCard(module, subjectId) {
         } else if (module.id === 'calculation' && subjectId === 'math') {
             // 数学口算练习模块
             window.location.href = '/math/calculation';
+        } else if (module.id === 'huxiaoqun' && subjectId === 'math') {
+            // 胡小群数学思维启发模块
+            window.location.href = '/math/huxiaoqun';
         } else if (module.id === 'books' && subjectId === 'chinese') {
             // 语文课文学习模块
             window.location.href = '/chinese/books';

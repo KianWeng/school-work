@@ -77,7 +77,8 @@ def get_subject_modules(subject_id):
             {'id': 'writing', 'name': '作文练习', 'description': '练习写作'}
         ],
         'math': [
-            {'id': 'calculation', 'name': '口算练习', 'description': '练习加减乘除'},
+            {'id': 'calculation', 'name': '口算练习', 'description': '练习加减乘除', 'icon': '➕'},
+            {'id': 'huxiaoqun', 'name': '胡小群数学思维启发', 'description': '思维突破必修课L0-L6', 'icon': '🧮'},
             {'id': 'word_problem', 'name': '应用题', 'description': '解决数学应用题'},
             {'id': 'geometry', 'name': '几何图形', 'description': '认识几何图形'},
             {'id': 'math_game', 'name': '数学游戏', 'description': '有趣的数学游戏'}

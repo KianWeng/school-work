@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>胡小群数学思维启发 - 小鱼快学</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/math_huxiaoqun.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>🧮 胡小群数学思维启发</h1>
+            <div class="header-actions">
+                <button class="back-btn" onclick="window.location.href='/'">← 返回首页</button>
+            </div>
+        </header>
+
+        <!-- 课程选择 -->
+        <div class="course-selector" id="courseSelector">
+            <h2>选择课程阶段</h2>
+            <p class="selector-description">思维突破必修课 - 从L0-L2到L3-L6，系统提升数学思维能力</p>
+            <div class="courses-grid" id="coursesGrid">
+                <!-- 课程卡片将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 章节列表 -->
+        <div class="sections-content" id="sectionsContent" style="display: none;">
+            <div class="sections-header">
+                <button class="back-btn" id="backToCourses" onclick="backToCourses()">← 返回课程选择</button>
+                <h2 id="courseTitle">章节列表</h2>
+            </div>
+            <div class="sections-list" id="sectionsList">
+                <!-- 章节列表将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 课程列表 -->
+        <div class="lessons-content" id="lessonsContent" style="display: none;">
+            <div class="lessons-header">
+                <button class="back-btn" id="backToSections" onclick="backToSections()">← 返回章节列表</button>
+                <h2 id="sectionTitle">课程列表</h2>
+            </div>
+            
+            <!-- PDF资源下载区域 -->
+            <div class="pdf-resources" id="pdfResources" style="display: none;">
+                <h3>📚 配套资源下载</h3>
+                <div class="pdf-links" id="pdfLinks">
+                    <!-- PDF下载链接将通过JavaScript动态加载 -->
+                </div>
+            </div>
+            
+            <div class="lessons-list" id="lessonsList">
+                <!-- 课程列表将通过JavaScript动态加载 -->
+            </div>
+        </div>
+
+        <!-- 视频播放器 -->
+        <div class="video-player-container" id="videoPlayerContainer" style="display: none;">
+            <div class="video-header">
+                <button class="back-btn" id="backToLessons" onclick="backToLessons()">← 返回课程列表</button>
+                <h2 id="lessonTitle">课程视频</h2>
+            </div>
+            <div class="video-wrapper">
+                <video id="lessonVideo" controls>
+                    您的浏览器不支持视频播放。
+                </video>
+            </div>
+            <div class="video-controls">
+                <button class="nav-btn" id="prevLessonBtn" onclick="playPrevLesson()" disabled>← 上一课</button>
+                <button class="nav-btn" id="nextLessonBtn" onclick="playNextLesson()" disabled>下一课 →</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/math_huxiaoqun.js') }}"></script>
+</body>
+</html>
